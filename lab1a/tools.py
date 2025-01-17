@@ -1,5 +1,6 @@
 from typing import List, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
 
 
@@ -80,3 +81,128 @@ def get_linearly_separable_dataset(
     labels = labels[indexes]
 
     return data, labels
+
+
+def plot_decision_boundary(
+    weights: np.ndarray, data: np.ndarray, labels: np.ndarray, title: str
+):
+    """
+    Plots a 2D dataset with its corresponding decision boundary.
+
+    Parameters:
+    ----------
+    weights : np.ndarray
+        A 1D NumPy array of shape (3,) or (,3) containing the weights of the decision
+        boundary equation: [w1, w2, b], where:
+        - w1 and w2 are the coefficients for the features X1 and X2.
+        - b is the bias term.
+    data : np.ndarray
+        A 2D NumPy array of shape (2, n_samples) containing the dataset. Each
+        column represents a data point, where the first row contains the X1
+        coordinates, and the second row contains the X2 coordinates.
+    labels : np.ndarray
+        A 1D NumPy array of shape (n_samples,) containing the class labels
+        (0 or 1) for each data point.
+    title : str
+        The title of the plot.
+
+    Returns:
+    -------
+    None
+        This function does not return anything. It displays the plot.
+
+    Notes:
+    -----
+    - The decision boundary is defined by the equation: `w1 * X1 + w2 * X2 + b = 0`.
+      If w2 is 0, a vertical line is plotted at `X1 = -b / w1`.
+    - The dataset points are colored based on their labels:
+        - "Class A" (label 0) is displayed in blue.
+        - "Class B" (label 1) is displayed in orange.
+    - The plot includes axes with gridlines for better visualization.
+    """
+    # Unpack weights (w1, w2, b)
+    w1, w2, b = weights
+
+    # Generate X1 values (spanning the range of the dataset)
+    x1_range = np.linspace(data[0, :].min() - 1, data[0, :].max() + 1, 100)
+
+    # Calculate x2 values using the decision boundary equation
+    if w2 != 0:  # Avoid division by zero
+        x2_range = -(w1 * x1_range + b) / w2
+    else:
+        x2_range = np.full_like(x1_range, -b / w1)  # Vertical line if w2 == 0
+
+    # Plot the data points
+    plt.scatter(
+        data[0, labels == 0],
+        data[1, labels == 0],
+        label="Class A",
+        alpha=0.7,
+        color="blue",
+    )
+    plt.scatter(
+        data[0, labels == 1],
+        data[
+            1,
+            labels == 1,
+        ],
+        label="Class B",
+        alpha=0.7,
+        color="orange",
+    )
+
+    # Plot the decision boundary
+    plt.plot(x1_range, x2_range, "k--", label="Decision boundary")
+
+    # Customize the plot
+    plt.axhline(0, color="gray", linestyle="--", linewidth=0.5)
+    plt.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+    plt.xlabel("X1")
+    plt.ylabel("X2")
+    plt.legend()
+    plt.title(title)
+    plt.tight_layout()
+    plt.show()
+
+
+class PerceptronClassifier:
+    def __init__(self) -> None:
+        self.weights: np.ndarray = None
+
+    def __add_bias(self, X: np.ndarray) -> np.ndarray:
+        return np.vstack((X, np.ones((1, X.shape[1]))))
+
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        learn_rate: float = 0.25,
+        epochs: int = 10,
+        batch: bool = False,
+    ) -> None:
+        inputs = self.__add_bias(X)
+        labels = y.reshape((-1, 1))
+
+        rndg = np.random.default_rng(seed=20250122)
+        self.weights = rndg.random((len(X) + 1, 1)) * 0.1 - 0.05
+        accumulator = np.zeros_like(self.weights)
+
+        for _ in range(epochs):
+            preds = self.predict(X)
+            delta = learn_rate * np.dot(inputs, labels - preds)
+
+            if batch:
+                accumulator += delta
+            else:
+                self.weights += delta
+
+        if batch:
+            self.weights += accumulator
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        inputs = self.__add_bias(X)
+
+        # Compute activations
+        activations = np.dot(np.transpose(self.weights), inputs)
+        # Threshold the activations
+        return np.where(activations > 0, 1, 0).reshape((-1, 1))
