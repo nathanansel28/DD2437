@@ -167,9 +167,28 @@ def plot_decision_boundary(
 
 class PerceptronClassifier:
     def __init__(self) -> None:
+        """
+        Initializes the PerceptronClassifier with no weights. The weights
+        are initialized during training using the `fit` method.
+        """
         self.weights: np.ndarray = None
 
     def __add_bias(self, X: np.ndarray) -> np.ndarray:
+        """
+        Adds a bias term to the input data by appending a row of ones.
+
+        Parameters:
+        ----------
+        X : np.ndarray
+            A 2D NumPy array of shape (n_features, n_samples), where each column
+            represents a data point.
+
+        Returns:
+        -------
+        np.ndarray
+            A 2D NumPy array of shape (n_features + 1, n_samples) with an
+            additional bias row of ones.
+        """
         return np.vstack((X, np.ones((1, X.shape[1]))))
 
     def fit(
@@ -180,15 +199,49 @@ class PerceptronClassifier:
         epochs: int = 10,
         batch: bool = False,
     ) -> None:
+        """
+        Trains the perceptron model using the input data and labels.
+
+        Parameters:
+        ----------
+        X : np.ndarray
+            A 2D NumPy array of shape (n_features, n_samples) containing the
+            training data. Each column is a data point.
+        y : np.ndarray
+            A 1D NumPy array of shape (n_samples,) containing the binary class
+            labels (0 or 1) for each data point.
+        learn_rate : float, optional
+            The learning rate for weight updates. Default is 0.25.
+        epochs : int, optional
+            The number of iterations over the training data. Default is 10.
+        batch : bool, optional
+            Whether to use batch updates. If True, updates are accumulated over
+            all samples before being applied to the weights. Default is False.
+
+        Returns:
+        -------
+        None
+            The trained weights are stored in the `weights` attribute.
+
+        Notes:
+        -----
+        - The weights are initialized randomly in the range [-0.05, 0.05].
+        - If `batch` is True, the updates are applied at the end of each epoch.
+        - This method modifies the `weights` attribute in place.
+        """
         inputs = self.__add_bias(X)
         labels = y.reshape((-1, 1))
 
         rndg = np.random.default_rng(seed=20250122)
+        # Initialise weight randomly with mean 0.05 and standard deviation 0.05
         self.weights = rndg.random((len(X) + 1, 1)) * 0.1 - 0.05
+        # Prepare delta accumulator in case of batch learning
         accumulator = np.zeros_like(self.weights)
 
         for _ in range(epochs):
+            # Get predictions
             preds = self.predict(X)
+            # Compute delta weights
             delta = learn_rate * np.dot(inputs, labels - preds)
 
             if batch:
@@ -200,6 +253,21 @@ class PerceptronClassifier:
             self.weights += accumulator
 
     def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts binary class labels for the input data.
+
+        Parameters:
+        ----------
+        X : np.ndarray
+            A 2D NumPy array of shape (n_features, n_samples) containing the
+            input data. Each column is a data point.
+
+        Returns:
+        -------
+        np.ndarray
+            A 2D NumPy array of shape (n_samples, 1) containing the predicted
+            binary class labels (0 or 1) for each data point.
+        """
         inputs = self.__add_bias(X)
 
         # Compute activations
