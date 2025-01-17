@@ -4,14 +4,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def get_linearly_separable_dataset(
+def generate_dataset(
     n_samples: int = 100,
     means: np.ndarray = np.array([[4.0, -2.0], [-2.0, 3.0]]),
     standard_deviations: List[float] = [3.5, 5.0],
     seed: int = 20250122,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Generates a synthetic, linearly separable dataset with two classes,
+    Generates a synthetic dataset with two classes,
     where each class follows a Gaussian-like distribution.
 
     Parameters:
@@ -134,8 +134,8 @@ def plot_decision_boundary(
 
     # Plot the data points
     plt.scatter(
-        data[0, labels == 0],
-        data[1, labels == 0],
+        data[0, labels != 1],
+        data[1, labels != 1],
         label="Class A",
         alpha=0.7,
         color="blue",
@@ -165,6 +165,25 @@ def plot_decision_boundary(
     plt.show()
 
 
+def add_bias(X: np.ndarray) -> np.ndarray:
+    """
+    Adds a bias term to the input data by appending a row of ones.
+
+    Parameters:
+    ----------
+    X : np.ndarray
+        A 2D NumPy array of shape (n_features, n_samples), where each column
+        represents a data point.
+
+    Returns:
+    -------
+    np.ndarray
+        A 2D NumPy array of shape (n_features + 1, n_samples) with an
+        additional bias row of ones.
+    """
+    return np.vstack((X, np.ones((1, X.shape[1]))))
+
+
 class PerceptronClassifier:
     def __init__(self) -> None:
         """
@@ -172,24 +191,6 @@ class PerceptronClassifier:
         are initialized during training using the `fit` method.
         """
         self.weights: np.ndarray = None
-
-    def __add_bias(self, X: np.ndarray) -> np.ndarray:
-        """
-        Adds a bias term to the input data by appending a row of ones.
-
-        Parameters:
-        ----------
-        X : np.ndarray
-            A 2D NumPy array of shape (n_features, n_samples), where each column
-            represents a data point.
-
-        Returns:
-        -------
-        np.ndarray
-            A 2D NumPy array of shape (n_features + 1, n_samples) with an
-            additional bias row of ones.
-        """
-        return np.vstack((X, np.ones((1, X.shape[1]))))
 
     def fit(
         self,
@@ -200,41 +201,48 @@ class PerceptronClassifier:
         batch: bool = False,
     ) -> None:
         """
-        Trains the perceptron model using the input data and labels.
+        Trains the perceptron model using the provided training data and labels.
 
         Parameters:
         ----------
         X : np.ndarray
             A 2D NumPy array of shape (n_features, n_samples) containing the
-            training data. Each column is a data point.
+            training data. Each column represents a data point.
         y : np.ndarray
-            A 1D NumPy array of shape (n_samples,) containing the binary class
-            labels (0 or 1) for each data point.
+            A 1D or 2D NumPy array of shape (n_samples,) or (n_samples, 1)
+            containing the class labels for each data point. For binary classification,
+            labels should be 0 or 1.
         learn_rate : float, optional
             The learning rate for weight updates. Default is 0.25.
         epochs : int, optional
-            The number of iterations over the training data. Default is 10.
+            The number of passes over the training data. Default is 10.
         batch : bool, optional
-            Whether to use batch updates. If True, updates are accumulated over
-            all samples before being applied to the weights. Default is False.
+            If True, updates are accumulated over all samples in an epoch before being applied (batch learning).
+            If False, weights are updated for each sample individually (online learning). Default is False.
 
         Returns:
         -------
         None
-            The trained weights are stored in the `weights` attribute.
+            Trains the model and updates the `weights` attribute in place.
 
         Notes:
         -----
-        - The weights are initialized randomly in the range [-0.05, 0.05].
-        - If `batch` is True, the updates are applied at the end of each epoch.
-        - This method modifies the `weights` attribute in place.
+        - Weights are initialized randomly in the range [-0.05, 0.05].
+        - For binary classification, `weights` will have shape (n_features + 1, 1).
+        - For multi-class classification, `weights` will have shape (n_features + 1, n_classes).
         """
-        inputs = self.__add_bias(X)
-        labels = y.reshape((-1, 1))
+        inputs = add_bias(X)
+        labels = y = (
+            y.reshape(-1, 1) if y.ndim == 1 else y
+        )  # Ensure y is (1, n_samples)
 
         rndg = np.random.default_rng(seed=20250122)
         # Initialise weight randomly with mean 0.05 and standard deviation 0.05
-        self.weights = rndg.random((len(X) + 1, 1)) * 0.1 - 0.05
+        num_classes = len(np.unique(y))
+        self.weights = (
+            rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
+            - 0.05
+        )
         # Prepare delta accumulator in case of batch learning
         accumulator = np.zeros_like(self.weights)
 
@@ -254,23 +262,143 @@ class PerceptronClassifier:
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
-        Predicts binary class labels for the input data.
+        Predicts class labels for the given input data.
 
         Parameters:
         ----------
         X : np.ndarray
             A 2D NumPy array of shape (n_features, n_samples) containing the
-            input data. Each column is a data point.
+            input data. Each column represents a data point.
 
         Returns:
         -------
         np.ndarray
-            A 2D NumPy array of shape (n_samples, 1) containing the predicted
-            binary class labels (0 or 1) for each data point.
+            A 1D NumPy array of shape (n_samples,) for multi-class classification,
+            or a 2D array of shape (n_samples, 1) for binary classification.
+            Binary predictions are 0 or 1.
+
+        Notes:
+        -----
+        - For binary classification, activations are thresholded at 0 to predict labels.
+        - For multi-class classification, the predicted label corresponds to the
+          index of the maximum activation.
         """
-        inputs = self.__add_bias(X)
+        inputs = add_bias(X)
 
         # Compute activations
         activations = np.dot(np.transpose(self.weights), inputs)
         # Threshold the activations
-        return np.where(activations > 0, 1, 0).reshape((-1, 1))
+        if self.weights.shape[1] == 1:  # Binary classification
+            return np.where(activations > 0, 1, 0).reshape((-1, 1))
+        return np.argmax(activations, axis=0)  # Multi-class classification
+
+
+class DeltaRuleClassifier:
+    def __init__(self) -> None:
+        """
+        Initializes the DeltaRuleClassifier with no weights. Weights are initialized
+        during training using the `fit` method.
+        """
+        self.weights = None
+
+    def fit(
+        self,
+        X: np.ndarray,
+        y: np.ndarray,
+        learn_rate: float = 0.001,
+        epochs: int = 20,
+        batch: bool = True,
+    ) -> None:
+        """
+        Trains the classifier on the input data and labels using gradient descent.
+
+        Parameters:
+        ----------
+        X : np.ndarray
+            A 2D NumPy array of shape (n_features, n_samples) containing the training data.
+            Each column is a data point.
+        y : np.ndarray
+            A 1D or 2D NumPy array of shape (n_samples,) or (n_samples, n_classes)
+            containing the true labels for each data point. Binary labels should be
+            represented as 1 and -1 for binary classification.
+        learn_rate : float, optional
+            The learning rate for weight updates. Default is 0.001.
+        epochs : int, optional
+            The number of iterations over the training data. Default is 20.
+        batch : bool, optional
+            If True, updates are accumulated over all samples before being applied to
+            the weights (batch learning). If False, weights are updated for each sample
+            individually (online learning). Default is True.
+
+        Returns:
+        -------
+        None
+            The trained weights are stored in the `weights` attribute.
+
+        Notes:
+        -----
+        - The weights are initialized randomly in the range [-0.05, 0.05].
+        - For binary classification, `weights` will have shape (n_features + 1, 1).
+        - For multi-class classification, `weights` will have shape
+          (n_features + 1, n_classes).
+        """
+        inputs = add_bias(X)
+        labels = y = (
+            y.reshape(-1, 1) if y.ndim == 1 else y
+        )  # Ensure y is (1, n_samples)
+
+        rndg = np.random.default_rng(seed=20250122)
+        # Initialise weight randomly with mean 0.05 and standard deviation 0.05
+        num_classes = len(np.unique(y))
+        self.weights = (
+            rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
+            - 0.05
+        )
+        # Prepare delta accumulator in case of batch learning
+        accumulator = np.zeros_like(self.weights)
+
+        for _ in range(epochs):
+            # Compute error
+            error = labels - np.dot(np.transpose(self.weights), inputs).reshape((-1, 1))
+            delta = learn_rate * np.dot(inputs, error)
+
+            if batch:
+                accumulator += delta
+            else:
+                self.weights += delta
+
+        if batch:
+            self.weights += delta
+
+    def predict(self, X: np.ndarray) -> np.ndarray:
+        """
+        Predicts class labels for the input data.
+
+        Parameters:
+        ----------
+        X : np.ndarray
+            A 2D NumPy array of shape (n_features, n_samples) containing the input data.
+            Each column is a data point.
+
+        Returns:
+        -------
+        np.ndarray
+            A 2D NumPy array of shape (n_samples, 1) for binary classification,
+            containing the predicted labels (1 or -1).
+            For multi-class classification, returns a 1D NumPy array of shape (n_samples,)
+            containing the predicted class indices (0, 1, ..., n_classes-1).
+
+        Notes:
+        -----
+        - For binary classification, activations are thresholded at 0.
+        - For multi-class classification, the predicted class corresponds to the index
+          of the maximum activation for each sample.
+        """
+        inputs = add_bias(X)
+
+        # Compute activations
+        activations = np.dot(np.transpose(self.weights), inputs)
+        # Threshold the activations
+        if self.weights.shape[1] == 1:  # Binary classification
+            return np.where(activations > 0, 1, -1).reshape((-1, 1))
+        return np.argmax(activations, axis=0)  # Multi-class classification
