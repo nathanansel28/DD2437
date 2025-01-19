@@ -1,4 +1,4 @@
-from typing import List, Tuple
+from typing import List, Tuple, Callable, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -182,6 +182,123 @@ def add_bias(X: np.ndarray) -> np.ndarray:
         additional bias row of ones.
     """
     return np.vstack((X, np.ones((1, X.shape[1]))))
+
+
+def subsample_random(
+    data: np.ndarray, 
+    labels: np.ndarray, 
+    fraction: float, 
+    class_label: Union[int, None] = None, 
+    seed: int = 42
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Removes a fraction of the dataset randomly, optionally filtered by class_label.
+
+    Parameters:
+        data (np.ndarray): The dataset of shape (features, samples).
+        labels (np.ndarray): Labels corresponding to the samples (1D array).
+        fraction (float): Fraction of samples to be removed (0 < fraction < 1).
+        class_label (Union[int, None]): If specified, only subsamples from this class.
+        seed (int): Random seed for reproducibility.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Subsampled data and corresponding labels.
+    """
+    np.random.seed(seed)
+
+    if class_label is None:
+        # Subsample from entire dataset
+        total_samples = int(data.shape[1] * fraction)
+        indices = np.random.choice(data.shape[1], total_samples, replace=False)
+    else:
+        # Subsample only from specified class
+        class_indices = np.where(labels == class_label)[0]
+        total_samples = int(len(class_indices) * fraction)
+        indices = np.random.choice(class_indices, total_samples, replace=False)
+
+    # Create new dataset excluding selected indices
+    mask = np.ones(data.shape[1], dtype=bool)
+    mask[indices] = False
+    return data[:, mask], labels[mask]
+
+
+def subsample_condition(
+    data: np.ndarray, 
+    labels: np.ndarray, 
+    condition_func1: Callable[[np.ndarray], np.ndarray], 
+    fraction1: float, 
+    condition_func2: Callable[[np.ndarray], np.ndarray], 
+    fraction2: float, 
+    seed: int = 42
+) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    Removes specified fractions of the dataset based on two condition functions.
+
+    Parameters:
+        data (np.ndarray): The dataset of shape (features, samples).
+        labels (np.ndarray): Labels corresponding to the samples (1D array).
+        condition_func1 (Callable[[np.ndarray], np.ndarray]): Condition function for subset 1 (e.g., X1 < 0).
+        fraction1 (float): Fraction of samples to remove from subset 1.
+        condition_func2 (Callable[[np.ndarray], np.ndarray]): Condition function for subset 2 (e.g., X1 > 0).
+        fraction2 (float): Fraction of samples to remove from subset 2.
+        seed (int): Random seed for reproducibility.
+
+    Returns:
+        Tuple[np.ndarray, np.ndarray]: Subsampled data and corresponding labels.
+    """
+    np.random.seed(seed) 
+
+    # Find indices satisfying each condition
+    indices_classA = np.where(labels == 0)[0]  # Class A indices
+    indices_classB = np.where(labels == 1)[0]  # Class B indices
+    indices_subset1 = np.where(condition_func1(data))[0]  # Class A subset 1 (X1 < 0)
+    indices_subset2 = np.where(condition_func2(data))[0]  # Class A subset 2 (X1 > 0)
+
+    # Separate indices for Class A and Class B
+    classA_indices_to_remove = np.intersect1d(indices_classA, np.concatenate([indices_subset1, indices_subset2]))
+    
+    # Randomly select indices to remove from Class A subsets
+    total_remove_subset1 = int(len(np.intersect1d(indices_classA, indices_subset1)) * fraction1)
+    total_remove_subset2 = int(len(np.intersect1d(indices_classA, indices_subset2)) * fraction2)
+    remove_indices_subset1 = np.random.choice(np.intersect1d(indices_classA, indices_subset1), total_remove_subset1, replace=False)
+    remove_indices_subset2 = np.random.choice(np.intersect1d(indices_classA, indices_subset2), total_remove_subset2, replace=False)
+
+    remove_indices_classA = np.concatenate([remove_indices_subset1, remove_indices_subset2])
+
+    # Combine removed indices of Class A and all indices of Class B (Class B is not removed)
+    remove_indices = np.concatenate([remove_indices_classA, indices_classB])
+
+    # Create mask to keep only the remaining data
+    mask = np.ones(data.shape[1], dtype=bool)
+    mask[remove_indices] = False
+
+    return data[:, mask], labels[mask]
+
+
+def plot_datasets(
+    original_data, original_labels, subsampled_data, subsampled_labels, title
+):
+    """
+    This is for task 3.
+    """
+    plt.figure(figsize=(6, 6))
+    plt.scatter(original_data[0, original_labels == 0], original_data[1, original_labels == 0],
+                color='blue', alpha=0.1, label='Class A (Original)')
+    plt.scatter(original_data[0, original_labels == 1], original_data[1, original_labels == 1],
+                color='orange', alpha=0.1, label='Class B (Original)')
+    
+    plt.scatter(subsampled_data[0, subsampled_labels == 0], subsampled_data[1, subsampled_labels == 0],
+                color='blue', alpha=0.7, label='Class A (Subsampled)', edgecolor='k', s=50)
+    plt.scatter(subsampled_data[0, subsampled_labels == 1], subsampled_data[1, subsampled_labels == 1],
+                color='orange', alpha=0.7, label='Class B (Subsampled)', edgecolor='k', s=50)
+    
+    plt.title(title)
+    plt.xlabel('X1')
+    plt.ylabel('X2')
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
 
 
 class PerceptronClassifier:
