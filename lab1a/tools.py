@@ -1,4 +1,4 @@
-from typing import List, Tuple, Callable, Union
+from typing import Callable, List, Tuple, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -185,11 +185,11 @@ def add_bias(X: np.ndarray) -> np.ndarray:
 
 
 def subsample_random(
-    data: np.ndarray, 
-    labels: np.ndarray, 
-    fraction: float, 
-    class_label: Union[int, None] = None, 
-    seed: int = 42
+    data: np.ndarray,
+    labels: np.ndarray,
+    fraction: float,
+    class_label: Union[int, None] = None,
+    seed: int = 42,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Removes a fraction of the dataset randomly, optionally filtered by class_label.
@@ -223,13 +223,13 @@ def subsample_random(
 
 
 def subsample_condition(
-    data: np.ndarray, 
-    labels: np.ndarray, 
-    condition_func1: Callable[[np.ndarray], np.ndarray], 
-    fraction1: float, 
-    condition_func2: Callable[[np.ndarray], np.ndarray], 
-    fraction2: float, 
-    seed: int = 42
+    data: np.ndarray,
+    labels: np.ndarray,
+    condition_func1: Callable[[np.ndarray], np.ndarray],
+    fraction1: float,
+    condition_func2: Callable[[np.ndarray], np.ndarray],
+    fraction2: float,
+    seed: int = 42,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
     Removes specified fractions of the dataset based on two condition functions.
@@ -246,7 +246,7 @@ def subsample_condition(
     Returns:
         Tuple[np.ndarray, np.ndarray]: Subsampled data and corresponding labels.
     """
-    np.random.seed(seed) 
+    np.random.seed(seed)
 
     # Find indices satisfying each condition
     indices_classA = np.where(labels == 0)[0]  # Class A indices
@@ -255,15 +255,31 @@ def subsample_condition(
     indices_subset2 = np.where(condition_func2(data))[0]  # Class A subset 2 (X1 > 0)
 
     # Separate indices for Class A and Class B
-    classA_indices_to_remove = np.intersect1d(indices_classA, np.concatenate([indices_subset1, indices_subset2]))
-    
-    # Randomly select indices to remove from Class A subsets
-    total_remove_subset1 = int(len(np.intersect1d(indices_classA, indices_subset1)) * fraction1)
-    total_remove_subset2 = int(len(np.intersect1d(indices_classA, indices_subset2)) * fraction2)
-    remove_indices_subset1 = np.random.choice(np.intersect1d(indices_classA, indices_subset1), total_remove_subset1, replace=False)
-    remove_indices_subset2 = np.random.choice(np.intersect1d(indices_classA, indices_subset2), total_remove_subset2, replace=False)
+    classA_indices_to_remove = np.intersect1d(
+        indices_classA, np.concatenate([indices_subset1, indices_subset2])
+    )
 
-    remove_indices_classA = np.concatenate([remove_indices_subset1, remove_indices_subset2])
+    # Randomly select indices to remove from Class A subsets
+    total_remove_subset1 = int(
+        len(np.intersect1d(indices_classA, indices_subset1)) * fraction1
+    )
+    total_remove_subset2 = int(
+        len(np.intersect1d(indices_classA, indices_subset2)) * fraction2
+    )
+    remove_indices_subset1 = np.random.choice(
+        np.intersect1d(indices_classA, indices_subset1),
+        total_remove_subset1,
+        replace=False,
+    )
+    remove_indices_subset2 = np.random.choice(
+        np.intersect1d(indices_classA, indices_subset2),
+        total_remove_subset2,
+        replace=False,
+    )
+
+    remove_indices_classA = np.concatenate(
+        [remove_indices_subset1, remove_indices_subset2]
+    )
 
     # Combine removed indices of Class A and all indices of Class B (Class B is not removed)
     remove_indices = np.concatenate([remove_indices_classA, indices_classB])
@@ -282,23 +298,46 @@ def plot_datasets(
     This is for task 3.
     """
     plt.figure(figsize=(6, 6))
-    plt.scatter(original_data[0, original_labels == 0], original_data[1, original_labels == 0],
-                color='blue', alpha=0.1, label='Class A (Original)')
-    plt.scatter(original_data[0, original_labels == 1], original_data[1, original_labels == 1],
-                color='orange', alpha=0.1, label='Class B (Original)')
-    
-    plt.scatter(subsampled_data[0, subsampled_labels == 0], subsampled_data[1, subsampled_labels == 0],
-                color='blue', alpha=0.7, label='Class A (Subsampled)', edgecolor='k', s=50)
-    plt.scatter(subsampled_data[0, subsampled_labels == 1], subsampled_data[1, subsampled_labels == 1],
-                color='orange', alpha=0.7, label='Class B (Subsampled)', edgecolor='k', s=50)
-    
+    plt.scatter(
+        original_data[0, original_labels == 0],
+        original_data[1, original_labels == 0],
+        color="blue",
+        alpha=0.1,
+        label="Class A (Original)",
+    )
+    plt.scatter(
+        original_data[0, original_labels == 1],
+        original_data[1, original_labels == 1],
+        color="orange",
+        alpha=0.1,
+        label="Class B (Original)",
+    )
+
+    plt.scatter(
+        subsampled_data[0, subsampled_labels == 0],
+        subsampled_data[1, subsampled_labels == 0],
+        color="blue",
+        alpha=0.7,
+        label="Class A (Subsampled)",
+        edgecolor="k",
+        s=50,
+    )
+    plt.scatter(
+        subsampled_data[0, subsampled_labels == 1],
+        subsampled_data[1, subsampled_labels == 1],
+        color="orange",
+        alpha=0.7,
+        label="Class B (Subsampled)",
+        edgecolor="k",
+        s=50,
+    )
+
     plt.title(title)
-    plt.xlabel('X1')
-    plt.ylabel('X2')
+    plt.xlabel("X1")
+    plt.ylabel("X2")
     plt.legend()
     plt.grid(True)
     plt.show()
-
 
 
 class PerceptronClassifier:
@@ -360,22 +399,21 @@ class PerceptronClassifier:
             rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
             - 0.05
         )
-        # Prepare delta accumulator in case of batch learning
-        accumulator = np.zeros_like(self.weights)
 
         for _ in range(epochs):
-            # Get predictions
-            preds = self.predict(X)
-            # Compute delta weights
-            delta = learn_rate * np.dot(inputs, labels - preds)
-
             if batch:
-                accumulator += delta
-            else:
-                self.weights += delta
+                # Get predictions
+                preds = self.predict(X)
+                # Compute delta weights
+                delta = learn_rate * np.dot(inputs, labels - preds)
 
-        if batch:
-            self.weights += accumulator
+                self.weights += delta
+            else:
+                for datapoint, label in zip(X.T, labels):
+                    error = label.item() - self.predict(datapoint.reshape(-1, 1)).item()
+                    delta = learn_rate * error * add_bias(datapoint.reshape(-1, 1))
+
+                    self.weights += delta
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -460,9 +498,7 @@ class DeltaRuleClassifier:
           (n_features + 1, n_classes).
         """
         inputs = add_bias(X)
-        labels = y = (
-            y.reshape(-1, 1) if y.ndim == 1 else y
-        )  # Ensure y is (1, n_samples)
+        labels = y.reshape(-1, 1) if y.ndim == 1 else y  # Ensure y is (1, n_samples)
 
         rndg = np.random.default_rng(seed=20250122)
         # Initialise weight randomly with mean 0.05 and standard deviation 0.05
@@ -471,21 +507,24 @@ class DeltaRuleClassifier:
             rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
             - 0.05
         )
-        # Prepare delta accumulator in case of batch learning
         accumulator = np.zeros_like(self.weights)
 
         for _ in range(epochs):
-            # Compute error
-            error = labels - np.dot(np.transpose(self.weights), inputs).reshape((-1, 1))
-            delta = learn_rate * np.dot(inputs, error)
-
             if batch:
+                # Compute error
+                error = labels.T - (self.weights.T @ inputs)
+                delta = learn_rate * (inputs @ error.T)
+
                 accumulator += delta
             else:
-                self.weights += delta
+                for datapoint, label in zip(inputs.T, labels):
+                    error = label.item() - (self.weights.T @ datapoint).item()
+                    delta = learn_rate * (datapoint.reshape(-1, 1) * error)
+
+                    self.weights += delta
 
         if batch:
-            self.weights += delta
+            self.weights += accumulator
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
