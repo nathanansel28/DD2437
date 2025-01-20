@@ -399,6 +399,7 @@ class PerceptronClassifier:
             rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
             - 0.05
         )
+        accumulator = np.zeros_like(self.weights)
 
         for _ in range(epochs):
             if batch:
@@ -407,13 +408,16 @@ class PerceptronClassifier:
                 # Compute delta weights
                 delta = learn_rate * np.dot(inputs, labels - preds)
 
-                self.weights += delta
+                accumulator += delta
             else:
                 for datapoint, label in zip(X.T, labels):
                     error = label.item() - self.predict(datapoint.reshape(-1, 1)).item()
                     delta = learn_rate * error * add_bias(datapoint.reshape(-1, 1))
 
                     self.weights += delta
+
+        if batch:
+            self.weights += accumulator
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
