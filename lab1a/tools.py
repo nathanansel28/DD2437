@@ -604,3 +604,22 @@ def subsample_conditional(
     final_labels = np.hstack((labels_A_final, labels_B))
 
     return final_data, final_labels
+
+
+def evaluate_model(
+    model: Union[DeltaRuleClassifier, PerceptronClassifier], 
+    data: np.ndarray, 
+    labels: np.ndarray
+):
+    preds = model.predict(data).flatten()
+    
+    true_positives = np.sum((preds == 1) & (labels == 1))
+    true_negatives = np.sum((preds == 0) & (labels == 0))
+    false_positives = np.sum((preds == 1) & (labels == 0))
+    false_negatives = np.sum((preds == 0) & (labels == 1))
+    
+    accuracy = np.mean(preds == labels)
+    sensitivity = true_positives / (true_positives + false_negatives) if (true_positives + false_negatives) > 0 else 0
+    specificity = true_negatives / (true_negatives + false_positives) if (true_negatives + false_positives) > 0 else 0
+    
+    return accuracy, sensitivity, specificity
