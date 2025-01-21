@@ -415,8 +415,8 @@ def plot_datasets(
 
     def scatter_data(data, labels, alpha, label_suffix="", edgecolor=None, s=None):
         plt.scatter(
-            data[0, labels == 0],
-            data[1, labels == 0],
+            data[0, labels != 1],
+            data[1, labels != 1],
             color="blue",
             alpha=alpha,
             label=f"Class A {label_suffix}",
