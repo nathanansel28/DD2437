@@ -242,7 +242,6 @@ class PerceptronClassifier:
             rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
             - 0.05
         )
-        accumulator = np.zeros_like(self.weights)
 
         for _ in range(epochs):
             if batch:
@@ -251,16 +250,13 @@ class PerceptronClassifier:
                 # Compute delta weights
                 delta = learn_rate * np.dot(inputs, labels - preds)
 
-                accumulator += delta
+                self.weights += delta
             else:
                 for datapoint, label in zip(X.T, labels):
                     error = label.item() - self.predict(datapoint.reshape(-1, 1)).item()
                     delta = learn_rate * error * add_bias(datapoint.reshape(-1, 1))
 
                     self.weights += delta
-
-        if batch:
-            self.weights += accumulator
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
@@ -347,31 +343,26 @@ class DeltaRuleClassifier:
         inputs = add_bias(X)
         labels = y.reshape(-1, 1) if y.ndim == 1 else y  # Ensure y is (1, n_samples)
 
-        rndg = np.random.default_rng(seed=20250122)
+        rndg = np.random.default_rng(seed=None)
         # Initialise weight randomly with mean 0.05 and standard deviation 0.05
         num_classes = len(np.unique(y))
         self.weights = (
             rndg.random((X.shape[0] + 1, 1 if num_classes == 2 else num_classes)) * 0.1
             - 0.05
         )
-        accumulator = np.zeros_like(self.weights)
 
         for _ in range(epochs):
             if batch:
                 # Compute error
-                error = labels.T - (self.weights.T @ inputs)
-                delta = learn_rate * (inputs @ error.T)
+                delta = -learn_rate * ((self.weights.T @ inputs) - labels.T) @ inputs.T
 
-                accumulator += delta
+                self.weights += delta.reshape(-1, 1)
             else:
                 for datapoint, label in zip(inputs.T, labels):
                     error = label.item() - (self.weights.T @ datapoint).item()
                     delta = learn_rate * (datapoint.reshape(-1, 1) * error)
 
                     self.weights += delta
-
-        if batch:
-            self.weights += accumulator
 
     def predict(self, X: np.ndarray) -> np.ndarray:
         """
