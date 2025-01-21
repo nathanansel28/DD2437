@@ -155,8 +155,7 @@ def plot_decision_boundary(
     plt.plot(x1_range, x2_range, "k--", label="Decision boundary")
 
     # Customize the plot
-    plt.axhline(0, color="gray", linestyle="--", linewidth=0.5)
-    plt.axvline(0, color="gray", linestyle="--", linewidth=0.5)
+    plt.grid(True, linestyle="--")
     plt.xlabel("X1")
     plt.ylabel("X2")
     plt.legend()
@@ -409,61 +408,79 @@ class DeltaRuleClassifier:
 
 
 def plot_datasets(
-    original_data, 
+    original_data,
     original_labels,
-    subsampled_data = None, 
-    subsampled_labels = None, 
-    title: str = ""
+    subsampled_data=None,
+    subsampled_labels=None,
+    title: str = "",
 ) -> None:
     """
     This is for task 3.
 
-    Plot the dataset with optional subsampled data. 
-    
+    Plot the dataset with optional subsampled data.
+
     If subsampled data is provided, the original data is shown with lower opacity.
     """
+
     def scatter_data(data, labels, alpha, label_suffix="", edgecolor=None, s=None):
         plt.scatter(
-            data[0, labels == 0], data[1, labels == 0], 
-            color="blue", alpha=alpha, label=f"Class A {label_suffix}", 
-            edgecolor=edgecolor, s=s
+            data[0, labels == 0],
+            data[1, labels == 0],
+            color="blue",
+            alpha=alpha,
+            label=f"Class A {label_suffix}",
+            edgecolor=edgecolor,
+            s=s,
         )
         plt.scatter(
-            data[0, labels == 1], data[1, labels == 1], 
-            color="orange", alpha=alpha, label=f"Class B {label_suffix}", 
-            edgecolor=edgecolor, s=s
+            data[0, labels == 1],
+            data[1, labels == 1],
+            color="orange",
+            alpha=alpha,
+            label=f"Class B {label_suffix}",
+            edgecolor=edgecolor,
+            s=s,
         )
-    
+
     if subsampled_data is not None and subsampled_labels is not None:
-        scatter_data(original_data, original_labels, alpha=0.1, label_suffix="(Original)")
-        scatter_data(subsampled_data, subsampled_labels, alpha=0.7, label_suffix="(Subsampled)", edgecolor="k", s=50)
+        scatter_data(
+            original_data, original_labels, alpha=0.1, label_suffix="(Original)"
+        )
+        scatter_data(
+            subsampled_data,
+            subsampled_labels,
+            alpha=0.7,
+            label_suffix="(Subsampled)",
+            edgecolor="k",
+            s=50,
+        )
     else:
         scatter_data(original_data, original_labels, alpha=0.7)
-    
+
     plt.title(title)
     plt.xlabel("X1")
     plt.ylabel("X2")
     plt.legend()
-    plt.grid(True)
+    plt.grid(True, linestyle="--")
     plt.show()
 
 
 def generate_subsample_dataset(
-    n_samples: int = 100, 
+    n_samples: int = 100,
     mA: np.array = np.array([1.0, 0.3]),
     mB: np.array = np.array([0.0, -0.1]),
     sigmaA: float = 0.2,
     sigmaB: float = 0.3,
-    seed: int = 20250122
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 
+    seed: int = 20250122,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """
     Generates the dataset required for part 2 of task 3.1.3
     """
     np.random.seed(seed)
 
     classA = np.zeros((2, n_samples))
-    classA[0, :n_samples//2] = np.random.randn(n_samples//2) * sigmaA - mA[0]
-    classA[0, n_samples//2:] = np.random.randn(n_samples//2) * sigmaA + mA[0]
+    classA[0, : n_samples // 2] = np.random.randn(n_samples // 2) * sigmaA - mA[0]
+    classA[0, n_samples // 2 :] = np.random.randn(n_samples // 2) * sigmaA + mA[0]
     classA[1, :] = np.random.randn(n_samples) * sigmaA + mA[1]
 
     classB = np.zeros((2, n_samples))
@@ -522,16 +539,16 @@ def subsample_conditional(
     classB: np.ndarray,
     labels_A: np.ndarray,
     labels_B: np.ndarray,
-    total_fraction: float=0.25,
-    fraction1: float=0.2,
-    fraction2: float=0.8,
+    total_fraction: float = 0.25,
+    fraction1: float = 0.2,
+    fraction2: float = 0.8,
     seed: int = 42,
 ) -> Tuple[np.ndarray, np.ndarray]:
     """
-    Subset 1 here refers to the subset of class A where X1 < 0. 
-    Meanwhile subset 2 refers to the subset of class A where X1 > 0. 
-    The goal of this function is to remove a random 25% of all the data samples 
-    where of the 25% removed datapoints, 20% comes from subset 1 and 80% comes from subset 2.  
+    Subset 1 here refers to the subset of class A where X1 < 0.
+    Meanwhile subset 2 refers to the subset of class A where X1 > 0.
+    The goal of this function is to remove a random 25% of all the data samples
+    where of the 25% removed datapoints, 20% comes from subset 1 and 80% comes from subset 2.
     """
 
     np.random.seed(seed)
@@ -545,16 +562,20 @@ def subsample_conditional(
     subset1_labels = labels_A[subset1_mask]
     subset2_labels = labels_A[subset2_mask]
 
-    subset1_fraction = int(fraction1 * total_fraction * classA.shape[1])  
-    subset2_fraction = int(fraction2 * total_fraction * classA.shape[1])  
+    subset1_fraction = int(fraction1 * total_fraction * classA.shape[1])
+    subset2_fraction = int(fraction2 * total_fraction * classA.shape[1])
 
     # Randomly select indices for subset2 (20%)
-    subset1_indices = np.random.choice(subset1.shape[1], subset1_fraction, replace=False)
+    subset1_indices = np.random.choice(
+        subset1.shape[1], subset1_fraction, replace=False
+    )
     subset1_remaining = np.delete(subset1, subset1_indices, axis=1)
     subset1_remaining_labels = np.delete(subset1_labels, subset1_indices)
 
     # Randomly select indices for subset2 (80%)
-    subset2_indices = np.random.choice(subset2.shape[1], subset2_fraction, replace=False)
+    subset2_indices = np.random.choice(
+        subset2.shape[1], subset2_fraction, replace=False
+    )
     subset2_remaining = np.delete(subset2, subset2_indices, axis=1)
     subset2_remaining_labels = np.delete(subset2_labels, subset2_indices)
 
@@ -562,11 +583,15 @@ def subsample_conditional(
     subset1_remove_count = int(0.25 * 0.2 * classA.shape[1])
     subset2_remove_count = int(0.25 * 0.8 * classA.shape[1])
 
-    subset1_remove_indices = np.random.choice(subset1_remaining.shape[1], subset1_remove_count, replace=False)
+    subset1_remove_indices = np.random.choice(
+        subset1_remaining.shape[1], subset1_remove_count, replace=False
+    )
     subset1_final = np.delete(subset1_remaining, subset1_remove_indices, axis=1)
     subset1_final_labels = np.delete(subset1_remaining_labels, subset1_remove_indices)
 
-    subset2_remove_indices = np.random.choice(subset2_remaining.shape[1], subset2_remove_count, replace=False)
+    subset2_remove_indices = np.random.choice(
+        subset2_remaining.shape[1], subset2_remove_count, replace=False
+    )
     subset2_final = np.delete(subset2_remaining, subset2_remove_indices, axis=1)
     subset2_final_labels = np.delete(subset2_remaining_labels, subset2_remove_indices)
 
