@@ -246,17 +246,20 @@ class MultiLayerPerceptronClassifier:
         # TODO: # return (1 + phi) * (1 - phi) / 2
 
 
-def mackey_glass_time_series(t: float) -> float:
-    if t > 0:
-        delay = mackey_glass_time_series(t - 25)
-        previous = mackey_glass_time_series(t - 1)
-        return previous + (0.2 * delay) / (1 + delay**10) + previous
-    elif t < 0:
-        return 0
-    else:
-        return 1.5
+def mackey_glass_time_series(t: float) -> np.ndarray:
+    y = np.empty(t, dtype=np.float64)
+    y[0] = 1.5
+
+    for i in range(1, len(y)):
+        delay = 0 if i - 25 < 0 else y[i - 25]
+        previous = y[i - 1]
+
+        y[i] = previous + (0.2 * delay) / (1 + delay**10) - 0.1 * previous
+
+    return y
 
 
 def generate_time_series_dataset(times: np.ndarray) -> np.ndarray:
-    generator = np.vectorize(mackey_glass_time_series)
-    return generator(times)
+    y = mackey_glass_time_series(np.max(times))
+    indexes = times - 1
+    return y[indexes]
