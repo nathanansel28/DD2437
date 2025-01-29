@@ -1,5 +1,5 @@
-from typing import List, Union, Dict, Tuple
-from functools import cache
+from typing import Dict, List, Tuple, Union
+
 import numpy as np
 
 
@@ -109,19 +109,18 @@ class MultiLayerPerceptronClassifier:
         self.activations: Dict[int, np.ndarray] = {}
         self.delta_weights: Dict[int, np.ndarray] = {}
         self.gradients: Dict[int, np.ndarray] = {}
-   
 
     def fit(
-        self, 
+        self,
         X: np.ndarray,
         y: np.ndarray,
         learn_rate: float = 0.25,
         epochs: int = 10,
         batch: bool = True,
     ) -> None:
-        if not batch: 
+        if not batch:
             raise NotImplementedError
-        
+
         inputs = add_bias(X)
         print(inputs.shape)
         labels = y = (
@@ -132,13 +131,12 @@ class MultiLayerPerceptronClassifier:
 
         for epoch_idx in range(epochs):
             print(f"\nEPOCH: {epoch_idx+1}")
-            if batch: 
+            if batch:
                 self.forward_pass(X=inputs)
                 self.backward_pass(y=labels)
                 self.update_weights(X=inputs, learn_rate=learn_rate)
 
-
-    # def _initialize_weights(self, X: np.ndarray, y) -> None: 
+    # def _initialize_weights(self, X: np.ndarray, y) -> None:
     #     """
     #     X already includes the bias term.
     #     """
@@ -158,7 +156,6 @@ class MultiLayerPerceptronClassifier:
     #     ]
     #     return weights
 
-
     def _initialize_weights(self, X: np.ndarray, y: np.ndarray) -> List[np.ndarray]:
         """
         Initializes weights for all layers of the MLP, including input, hidden, and output layers.
@@ -173,7 +170,9 @@ class MultiLayerPerceptronClassifier:
 
         # Hidden layers
         for _ in range(self.hidden_layers - 1):
-            weights.append(rndg.uniform(-0.05, 0.05, size=(hidden_size + 1, hidden_size)))
+            weights.append(
+                rndg.uniform(-0.05, 0.05, size=(hidden_size + 1, hidden_size))
+            )
 
         # Last hidden layer → Output layer
         output_size = len(np.unique(y))  # Number of classes (output layer size)
@@ -181,70 +180,83 @@ class MultiLayerPerceptronClassifier:
 
         return weights
 
-
-    def forward_pass(
-        self, X: np.ndarray, current_layer: int = 0
-    ) -> np.ndarray:
+    def forward_pass(self, X: np.ndarray, current_layer: int = 0) -> np.ndarray:
         """
-        Uses a recursive structure to perform forward pass for all the layers. 
+        Uses a recursive structure to perform forward pass for all the layers.
 
         Parameters
         ----------
         X : np.ndarray
             A 2D NumPy array of shape (n_features + 1, n_samples) which also include the bias term.
         current_layer : int = 0
-            The current layer of the calculation. The forward pass starts at 0 which is the default value. 
+            The current layer of the calculation. The forward pass starts at 0 which is the default value.
         """
 
         print(f"\nLayer: {current_layer}")
-        print(f"Weights of the current layer: {np.transpose(self.weights[current_layer]).shape}, \n {self.weights[current_layer]}")
+        print(
+            f"Weights of the current layer: {np.transpose(self.weights[current_layer]).shape}, \n {self.weights[current_layer]}"
+        )
         print(f"Current inputs: {X.shape} \n {X}")
-        try: 
+        try:
             self.activations[current_layer] = self.phi(
                 self.weights[current_layer].T @ X
             )
-        except Exception as e: 
+        except Exception as e:
             print(f"X: {X}")
             raise ValueError
 
         if current_layer == self.hidden_layers:
-            return None # break the recursion
-        else: 
+            return None  # break the recursion
+        else:
             return self.forward_pass(
-                X=add_bias(self.activations[current_layer]), current_layer=current_layer+1
+                X=add_bias(self.activations[current_layer]),
+                current_layer=current_layer + 1,
             )
 
     def backward_pass(
-        self, y: np.ndarray, current_layer: Union[int, None]=None, batch: bool = True
+        self, y: np.ndarray, current_layer: Union[int, None] = None, batch: bool = True
     ) -> np.ndarray:
-        if not batch: 
+        if not batch:
             raise NotImplementedError
-        if not current_layer: 
+        if not current_layer:
             current_layer = self.hidden_layers - 1
 
         self.delta_weights[current_layer] = (
-            (self.activations[current_layer] - y) * self.phi_gradient(self.activations[current_layer - 1])
-        )
+            self.activations[current_layer] - y
+        ) * self.phi_gradient(self.activations[current_layer - 1])
         if current_layer != 0:
             return self.backward_pass(
-                y = self.activations[current_layer - 1], current_layer = current_layer - 1
+                y=self.activations[current_layer - 1], current_layer=current_layer - 1
             )
-        else: 
-            return None # break the recursion
+        else:
+            return None  # break the recursion
 
-
-    def update_weights(self, X: np.ndarray, learn_rate: float = 0.25) -> None: 
-        for i, weight in enumerate(self.weights): 
+    def update_weights(self, X: np.ndarray, learn_rate: float = 0.25) -> None:
+        for i, weight in enumerate(self.weights):
             self.weights[i] -= learn_rate * X * self.delta_weights[i]
 
+    # @cache
+    def phi(self, X: np.ndarray):
+        return 2 / (1 + np.exp(-X)) - 1
 
     # @cache
-    def phi(self, X: np.ndarray): 
-        return 2 / (1 + np.exp(-X)) - 1
-    
-
-    # @cache    
-    def phi_gradient(self, X: np.ndarray): 
+    def phi_gradient(self, X: np.ndarray):
         # """Current implementation still uses caching via the Python decorator."""
         return (1 + self.phi(X)) * (1 - self.phi(X)) / 2
         # TODO: # return (1 + phi) * (1 - phi) / 2
+
+
+def mackey_glass_time_series(t: float) -> float:
+    if t > 0:
+        delay = mackey_glass_time_series(t - 25)
+        previous = mackey_glass_time_series(t - 1)
+        return previous + (0.2 * delay) / (1 + delay**10) + previous
+    elif t < 0:
+        return 0
+    else:
+        return 1.5
+
+
+def generate_time_series_dataset(times: np.ndarray) -> np.ndarray:
+    generator = np.vectorize(mackey_glass_time_series)
+    return generator(times)
