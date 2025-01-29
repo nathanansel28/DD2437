@@ -1,5 +1,7 @@
-from typing import List, Union, Dict, Tuple
+from typing import Dict, List, Tuple, Union
+
 import numpy as np
+
 
 def generate_dataset(
     n_samples: int = 100,
@@ -100,3 +102,19 @@ def generate_gaussian_data(n):
     
     return patterns, targets
 
+
+
+def mackey_glass_time_series(t: float) -> float:
+    if t > 0:
+        delay = mackey_glass_time_series(t - 25)
+        previous = mackey_glass_time_series(t - 1)
+        return previous + (0.2 * delay) / (1 + delay**10) + previous
+    elif t < 0:
+        return 0
+    else:
+        return 1.5
+
+
+def generate_time_series_dataset(times: np.ndarray) -> np.ndarray:
+    generator = np.vectorize(mackey_glass_time_series)
+    return generator(times)
