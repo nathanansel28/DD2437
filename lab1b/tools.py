@@ -78,3 +78,25 @@ def generate_dataset(
     labels = labels[indexes]
 
     return data, labels
+
+
+
+def generate_gaussian_data(n):
+    """
+    Generate n data samples following the given Gaussian function.
+    Returns:
+        patterns: (2, n) array of input data
+        targets: (1, n) array of output data
+    """
+    
+    x = np.linspace(-5, 5, int(np.sqrt(n)))
+    y = np.linspace(-5, 5, int(np.sqrt(n)))
+    xx, yy = np.meshgrid(x, y)
+    
+    # Compute the Gaussian function
+    z = np.exp(- (xx**2 + yy**2) / 10) - 0.5
+    patterns = np.vstack((xx.ravel(), yy.ravel()))
+    targets = z.ravel().reshape(1, -1)
+    
+    return patterns, targets
+
