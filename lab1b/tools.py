@@ -1,6 +1,14 @@
 from typing import Dict, List, Tuple, Union
 
 import numpy as np
+import tensorflow as tf
+
+"""
+================
+CODE FOR SPLIT 1
+================
+"""
+
 
 
 def generate_dataset(
@@ -82,8 +90,13 @@ def generate_dataset(
     return data, labels
 
 
+"""
+================
+CODE FOR SPLIT 2
+================
+"""
 
-def generate_gaussian_data(n):
+def generate_gaussian_data(n) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate n data samples following the given Gaussian function.
     Returns:
@@ -103,6 +116,20 @@ def generate_gaussian_data(n):
     return patterns, targets
 
 
+def load_MLP_regressor(n_nodes: int=10) -> tf.keras.Sequential:
+    return tf.keras.Sequential([
+        tf.keras.layers.Dense(n_nodes, activation='relu', input_shape=(2,)),
+        tf.keras.layers.Dense(n_nodes, activation='relu'),
+        tf.keras.layers.Dense(1)
+    ])
+
+
+
+"""
+================
+CODE FOR SPLIT 3
+================
+"""
 
 def mackey_glass_time_series(t: float) -> np.ndarray:
     y = np.empty(t, dtype=np.float64)
