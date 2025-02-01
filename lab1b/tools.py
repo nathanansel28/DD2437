@@ -11,6 +11,7 @@ from sklearn.preprocessing import StandardScaler
 from tensorflow.keras import Model, Sequential, activations, regularizers
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.initializers import HeNormal
 import tensorflow as tf
 import matplotlib.pyplot as plt
 
@@ -132,7 +133,7 @@ def generate_gaussian_data(
 @dataclass 
 class ModelResult: 
     "Dataclass to store model and its performance metrics."
-    model: tf.keras.Sequential
+    model: Sequential
     mse_train: float 
     mse_val: float
     mse_overall: float
@@ -141,15 +142,23 @@ class ModelResult:
 def load_MLP_regressor(
     n_nodes: int=10,
     optimizer='adam', 
-    loss='mse'
-) -> tf.keras.Sequential:
+    loss='mse',
+    use_kernel_initializer: bool=False
+) -> Sequential:
     "Loads a 2-layer Keras MLP with relu activation function."
     tf.random.set_seed(42)
-    model = tf.keras.Sequential([
-        tf.keras.layers.Dense(n_nodes, activation='relu', input_shape=(2,)),
-        tf.keras.layers.Dense(n_nodes, activation='relu'),
-        tf.keras.layers.Dense(1)
-    ])
+    if use_kernel_initializer: 
+        model = Sequential([
+            Dense(n_nodes, activation='relu', kernel_initializer=HeNormal(), input_shape=(2,)),
+            Dense(n_nodes, activation='relu', kernel_initializer=HeNormal()),
+            Dense(1, activation='linear')
+        ])
+    else: 
+        model = Sequential([
+            Dense(n_nodes, activation='relu', input_shape=(2,)),
+            Dense(n_nodes, activation='relu'),
+            Dense(1, activation='linear')
+        ])
     model.compile(optimizer=optimizer, loss=loss)
     return model
 
@@ -157,9 +166,11 @@ def load_MLP_regressor(
 def split_dataset(
     X: np.ndarray, 
     y: np.ndarray,
-    training_fraction: float = 0.6
+    training_fraction: float = 0.6,
+    use_seed: bool = True
 ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 
-    np.random.seed(42)
+    if use_seed:
+        np.random.seed(42)
 
     num_samples = X.shape[0]
     indices = np.arange(num_samples)
@@ -175,7 +186,7 @@ def split_dataset(
 
 
 def evaluate(
-    model: tf.keras.Sequential, 
+    model: Sequential, 
     X: np.ndarray, 
     y: np.ndarray,
     X_train: np.ndarray = None, 
@@ -202,9 +213,12 @@ def evaluate(
 
 def plot_mse_results(
     x_axis: Literal["nodes", "training_fraction"],
-    list_mse_train: List[float],
-    list_mse_val: List[float],
-    list_mse_overall: List[float],
+    list_avg_mse_train: List[float],
+    list_avg_mse_val: List[float],
+    list_avg_mse_overall: List[float],
+    list_stdev_mse_train: List[float],
+    list_stdev_mse_val: List[float],
+    list_stdev_mse_overall: List[float],
     fig_size = (10,6)
 ) -> None: 
     assert x_axis in ["nodes", "training_fraction"]
@@ -214,16 +228,16 @@ def plot_mse_results(
         x_axis_range = list(range(1, 26, 1))
         plt.xlabel('Number of Nodes in MLP')
         plt.ylabel('Mean Squared Error (MSE)')
-        plt.title('MSE vs Number of Nodes in MLP')
+        plt.title('MSE vs Number of Nodes in MLP (Mean and SD)')
     elif x_axis == "training_fraction":
         x_axis_range = list(range(20, 81, 10))
         plt.xlabel('Training Fraction (%)')
         plt.ylabel('Mean Squared Error (MSE)')
-        plt.title('MSE vs Training Fraction')
+        plt.title('MSE vs Training Fraction (Mean and SD)')
 
-    plt.plot(x_axis_range, list_mse_train, label='Train MSE', marker='o', linestyle='-')
-    plt.plot(x_axis_range, list_mse_val, label='Validation MSE', marker='s', linestyle='--')
-    plt.plot(x_axis_range, list_mse_overall, label='Overall MSE', marker='d', linestyle='-.')
+    plt.errorbar(x_axis_range, list_avg_mse_train, yerr=list_stdev_mse_train, fmt='o-', capsize=5, label="MSE Train", color='b')
+    plt.errorbar(x_axis_range, list_avg_mse_val, yerr=list_stdev_mse_val, fmt='o-', capsize=5, label="MSE Val", color='r')
+    plt.errorbar(x_axis_range, list_avg_mse_overall, yerr=list_stdev_mse_overall, fmt='o-', capsize=5, label="MSE Overall", color='g')
 
     plt.legend()
     plt.grid(True)
