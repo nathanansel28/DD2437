@@ -1,6 +1,15 @@
-from typing import Dict, List, Tuple, Union
+import copy
+from typing import List, Tuple
 
+import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
+from sklearn.metrics import mean_squared_error
+from sklearn.neural_network import MLPRegressor
+from sklearn.preprocessing import StandardScaler
+from tensorflow.keras import Model, Sequential, activations, regularizers
+from tensorflow.keras.callbacks import EarlyStopping
+from tensorflow.keras.layers import Dense
 import tensorflow as tf
 
 """
@@ -103,16 +112,16 @@ def generate_gaussian_data(n) -> Tuple[np.ndarray, np.ndarray]:
         patterns: (2, n) array of input data
         targets: (1, n) array of output data
     """
-    
+
     x = np.linspace(-5, 5, int(np.sqrt(n)))
     y = np.linspace(-5, 5, int(np.sqrt(n)))
     xx, yy = np.meshgrid(x, y)
-    
+
     # Compute the Gaussian function
-    z = np.exp(- (xx**2 + yy**2) / 10) - 0.5
+    z = np.exp(-(xx**2 + yy**2) / 10) - 0.5
     patterns = np.vstack((xx.ravel(), yy.ravel()))
     targets = z.ravel().reshape(1, -1)
-    
+
     return patterns, targets
 
 
@@ -144,7 +153,293 @@ def mackey_glass_time_series(t: float) -> np.ndarray:
     return y
 
 
-def generate_time_series_dataset(times: np.ndarray) -> np.ndarray:
-    y = mackey_glass_time_series(np.max(times))
-    indexes = times - 1
-    return y[indexes]
+class SKTimeSeriesMLP:
+    def __init__(
+        self,
+        data_dim=5,
+        hidden_nodes=(8, 6),  # matching the working example structure
+        n_epochs=1000,
+        patience=10,
+        early_stopping=True,
+        lmbda=0.01,
+    ):
+        self.data_dim = data_dim
+        self.hidden_nodes = hidden_nodes
+        self.n_epochs = n_epochs
+        self.patience = patience
+        self.early_stopping = early_stopping
+        self.lmbda = lmbda
+
+        # Initialize model based on early_stopping flag
+        if early_stopping:
+            alpha = 0  # No regularization when using early stopping
+        else:
+            alpha = lmbda  # Use L2 regularization when no early stopping
+
+        self.model = MLPRegressor(
+            hidden_layer_sizes=hidden_nodes,
+            activation="logistic",
+            solver="adam",
+            alpha=alpha,
+            batch_size=32,  # Match the working code's batch size
+            learning_rate="constant",  # More similar to Keras implementation
+            learning_rate_init=0.001,
+            max_iter=1,
+            warm_start=True,
+            random_state=42,
+        )
+
+        self.scaler_X = StandardScaler()
+        self.scaler_y = StandardScaler()
+        self.best_model = None
+        self.best_loss = np.inf
+
+    def fit(self, X_train, y_train, X_val, y_val):
+        # Scale data
+        X_train_scaled = self.scaler_X.fit_transform(X_train)
+        X_val_scaled = self.scaler_X.transform(X_val)
+
+        y_train_scaled = self.scaler_y.fit_transform(y_train.reshape(-1, 1)).ravel()
+        y_val_scaled = self.scaler_y.transform(y_val.reshape(-1, 1)).ravel()
+
+        history = {"loss": [], "val_loss": [], "epoch": []}
+        no_improvement_count = 0
+
+        for epoch in range(self.n_epochs):
+            self.model.partial_fit(X_train_scaled, y_train_scaled)
+
+            # Calculate losses
+            train_loss = mean_squared_error(
+                y_train_scaled, self.model.predict(X_train_scaled)
+            )
+            val_loss = mean_squared_error(
+                y_val_scaled, self.model.predict(X_val_scaled)
+            )
+
+            history["loss"].append(train_loss)
+            history["val_loss"].append(val_loss)
+            history["epoch"].append(epoch)
+
+            # Early stopping logic
+            if self.early_stopping:
+                if val_loss < (self.best_loss - 1e-4):
+                    self.best_loss = val_loss
+                    self.best_model = copy.deepcopy(self.model)
+                    no_improvement_count = 0
+                else:
+                    no_improvement_count += 1
+
+                if no_improvement_count >= self.patience:
+                    print(f"Early stopping at epoch {epoch}")
+                    break
+
+        # Restore best model if using early stopping
+        if self.early_stopping and self.best_model is not None:
+            self.model = self.best_model
+
+        return history
+
+    def predict(self, X):
+        X_scaled = self.scaler_X.transform(X)
+        predictions_scaled = self.model.predict(X_scaled)
+        return self.scaler_y.inverse_transform(
+            predictions_scaled.reshape(-1, 1)
+        ).ravel()
+
+
+class TimeSeriesMLP(Model):
+    def __init__(
+        self,
+        data_dim=5,
+        output_dim=1,
+        hidden_nodes=(8, 6),
+        n_epochs=500,
+        patience=10,
+        early_stopping=True,
+        lmbda=0.01,
+    ):
+        super(TimeSeriesMLP, self).__init__()
+
+        self.hidden_nodes = hidden_nodes
+        self.hidden_n = len(hidden_nodes)
+        self.data_dim = data_dim
+        self.output_dim = output_dim
+        self.patience = patience
+        self.n_epochs = n_epochs
+        self.early_stopping = early_stopping
+        self.lmbda = lmbda
+
+        self.build_model()
+
+    def build_model(self):
+        self.model = Sequential()
+
+        # Input layer
+        self.model.add(
+            Dense(units=self.data_dim, activation=activations.linear, use_bias=True)
+        )
+
+        if self.early_stopping:
+            # Hidden layers without regularization when using early stopping
+            for i in range(self.hidden_n):
+                self.model.add(
+                    Dense(
+                        units=self.hidden_nodes[i],
+                        activation=activations.sigmoid,
+                        use_bias=True,
+                    )
+                )
+
+            # Output layer without regularization
+            self.model.add(
+                Dense(
+                    units=self.output_dim, activation=activations.linear, use_bias=True
+                )
+            )
+        else:
+            # Hidden layers with L2 regularization when not using early stopping
+            for i in range(self.hidden_n):
+                self.model.add(
+                    Dense(
+                        units=self.hidden_nodes[i],
+                        activation=activations.sigmoid,
+                        use_bias=True,
+                        kernel_regularizer=regularizers.l2(self.lmbda),
+                    )
+                )
+
+            # Output layer with L2 regularization
+            self.model.add(
+                Dense(
+                    units=self.output_dim,
+                    activation=activations.linear,
+                    use_bias=True,
+                    kernel_regularizer=regularizers.l2(self.lmbda),
+                )
+            )
+
+        # Compile model
+        self.model.compile(optimizer="adam", loss="mse")
+
+    def fit(self, X_train, y_train, X_val, y_val):
+        if self.early_stopping:
+            # Define early stopping callback
+            early_stopping = EarlyStopping(
+                monitor="val_loss",
+                patience=self.patience,
+                restore_best_weights=True,
+                verbose=0,
+            )
+
+            history = self.model.fit(
+                X_train,
+                y_train,
+                validation_data=(X_val, y_val),
+                epochs=self.n_epochs,
+                # batch_size=200,
+                verbose=1,
+                callbacks=[early_stopping],
+            )
+        else:
+            history = self.model.fit(
+                X_train,
+                y_train,
+                validation_data=(X_val, y_val),
+                epochs=self.n_epochs,
+                # batch_size=200,
+                verbose=1,
+            )
+
+        return history.history
+
+    def predict(self, X):
+        return self.model.predict(X, verbose=0)
+
+    def evaluate(self, X_eval, y_eval):
+        return self.model.evaluate(X_eval, y_eval, verbose=0)
+
+
+def plot_training_histories(histories):
+    """
+    Plot training histories for different MLP configurations
+
+    Parameters:
+    histories: dict
+        Dictionary where keys are tuples of (n_nodes_layer1, n_nodes_layer2)
+        and values are dictionaries containing 'train_loss', 'val_loss', and 'epoch'
+    """
+    # Set up the plotting style
+    plt.style.use("seaborn-v0_8-whitegrid")
+    plt.rcParams.update({"font.size": 20})
+    fig, ax = plt.subplots(figsize=(12, 8))
+
+    # Color palette for different configurations
+    n_configs = len(histories)
+    colors = sns.color_palette("husl", n_configs)
+
+    # Find the best configuration based on minimum validation loss
+    best_config = min(histories.items(), key=lambda x: x[1][("best_loss", "mean")][-1])
+
+    # Plot each configuration
+    for (config, history), color in zip(histories.items(), colors):
+        epochs = history[("epoch", "")]
+
+        # Plot with higher alpha if it's the best configuration
+        alpha = 1.0 if config == best_config[0] else 0.25
+
+        # Plot training loss
+        ax.plot(
+            epochs,
+            history[("train_loss", "mean")],
+            color=color,
+            linestyle="-",
+            alpha=alpha,
+            label=f"Train {config}",
+        )
+
+        # Plot validation loss
+        ax.plot(
+            epochs,
+            history[("val_loss", "mean")],
+            color=color,
+            linestyle="--",
+            marker="o",
+            markersize=4,
+            markevery=5,
+            alpha=alpha,
+            label=f"Val {config}",
+        )
+
+    # Highlight the best configuration in the legend
+    legend = ax.legend(
+        title="Configuration (nodes per layer)",
+        bbox_to_anchor=(1.05, 1),
+        loc="upper left",
+    )
+    for text in legend.get_texts():
+        if str(best_config[0]) in text.get_text():
+            text.set_weight("bold")
+
+    # Customize the plot
+    ax.set_xlabel("Epoch")
+    ax.set_ylabel("Average MSE")
+    ax.set_title("MLP Training History for Different Layer Configurations")
+    ax.grid(True, alpha=0.3)
+
+    # Add text box with best configuration details
+    best_final_val = best_config[1][("val_loss", "mean")][-1]
+    textstr = f"Best Config: {best_config[0]}\nFinal Val Loss: {best_final_val:.4f}"
+    props = dict(boxstyle="round", facecolor="wheat", alpha=0.5)
+    ax.text(
+        0.02,
+        0.98,
+        textstr,
+        transform=ax.transAxes,
+        fontsize=10,
+        verticalalignment="top",
+        bbox=props,
+    )
+
+    # Adjust layout to prevent label cutoff
+    plt.tight_layout()
+    return fig, ax
