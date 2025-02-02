@@ -118,17 +118,22 @@ def generate_gaussian_data(
         targets: (1, n) array of output data
     """
 
-    x = np.linspace(-5, 5, int(np.sqrt(n)))
-    y = np.linspace(-5, 5, int(np.sqrt(n)))
+    grid_size = int(np.sqrt(n))
+    n_actual = grid_size ** 2
+
+    x = np.linspace(-5, 5, grid_size)
+    y = np.linspace(-5, 5, grid_size)
     xx, yy = np.meshgrid(x, y)
 
-    # Compute the Gaussian function
     z = np.exp(-(xx**2 + yy**2) / 10) - 0.5
-    patterns = np.vstack((xx.ravel(), yy.ravel()))
-    targets = z.ravel().reshape(1, -1)
-    
-    return patterns.T, targets.T
+    patterns = np.vstack((xx.ravel(), yy.ravel())).T
+    targets = z.ravel().reshape(-1, 1)
 
+    np.random.seed(123456789)
+    indices = np.random.permutation(n_actual)
+    patterns, targets = patterns[indices], targets[indices]
+
+    return patterns, targets
 
 @dataclass 
 class ModelResult: 
@@ -213,6 +218,7 @@ def evaluate(
 
 def plot_mse_results(
     x_axis: Literal["nodes", "training_fraction"],
+    x_axis_range: List[int],
     list_avg_mse_train: List[float],
     list_avg_mse_val: List[float],
     list_avg_mse_overall: List[float],
@@ -225,12 +231,10 @@ def plot_mse_results(
 
     plt.figure(figsize=fig_size)
     if x_axis == "nodes":
-        x_axis_range = list(range(1, 26, 1))
         plt.xlabel('Number of Nodes in MLP')
         plt.ylabel('Mean Squared Error (MSE)')
         plt.title('MSE vs Number of Nodes in MLP (Mean and SD)')
     elif x_axis == "training_fraction":
-        x_axis_range = list(range(20, 81, 10))
         plt.xlabel('Training Fraction (%)')
         plt.ylabel('Mean Squared Error (MSE)')
         plt.title('MSE vs Training Fraction (Mean and SD)')
