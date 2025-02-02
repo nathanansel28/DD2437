@@ -1,5 +1,6 @@
 import copy
-from typing import List, Tuple
+from typing import Dict, List, Tuple, Union, Literal
+from dataclasses import dataclass 
 
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,6 +11,16 @@ from sklearn.preprocessing import StandardScaler
 from tensorflow.keras import Model, Sequential, activations, regularizers
 from tensorflow.keras.callbacks import EarlyStopping
 from tensorflow.keras.layers import Dense
+from tensorflow.keras.initializers import HeNormal
+import tensorflow as tf
+import matplotlib.pyplot as plt
+
+"""
+================
+CODE FOR SPLIT 1
+================
+"""
+
 
 
 def generate_dataset(
@@ -91,7 +102,15 @@ def generate_dataset(
     return data, labels
 
 
-def generate_gaussian_data(n):
+"""
+================
+CODE FOR SPLIT 2
+================
+"""
+
+def generate_gaussian_data(
+    n: int
+) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate n data samples following the given Gaussian function.
     Returns:
@@ -107,9 +126,130 @@ def generate_gaussian_data(n):
     z = np.exp(-(xx**2 + yy**2) / 10) - 0.5
     patterns = np.vstack((xx.ravel(), yy.ravel()))
     targets = z.ravel().reshape(1, -1)
+    
+    return patterns.T, targets.T
 
-    return patterns, targets
 
+@dataclass 
+class ModelResult: 
+    "Dataclass to store model and its performance metrics."
+    model: Sequential
+    mse_train: float 
+    mse_val: float
+    mse_overall: float
+
+
+def load_MLP_regressor(
+    n_nodes: int=10,
+    optimizer='adam', 
+    loss='mse',
+    use_kernel_initializer: bool=False
+) -> Sequential:
+    "Loads a 2-layer Keras MLP with relu activation function."
+    tf.random.set_seed(42)
+    if use_kernel_initializer: 
+        model = Sequential([
+            Dense(n_nodes, activation='relu', kernel_initializer=HeNormal(), input_shape=(2,)),
+            Dense(n_nodes, activation='relu', kernel_initializer=HeNormal()),
+            Dense(1, activation='linear')
+        ])
+    else: 
+        model = Sequential([
+            Dense(n_nodes, activation='relu', input_shape=(2,)),
+            Dense(n_nodes, activation='relu'),
+            Dense(1, activation='linear')
+        ])
+    model.compile(optimizer=optimizer, loss=loss)
+    return model
+
+
+def split_dataset(
+    X: np.ndarray, 
+    y: np.ndarray,
+    training_fraction: float = 0.6,
+    use_seed: bool = True
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 
+    if use_seed:
+        np.random.seed(42)
+
+    num_samples = X.shape[0]
+    indices = np.arange(num_samples)
+
+    val_size = int(num_samples * training_fraction)
+    val_indices = indices[:val_size]
+    train_indices = indices[val_size:]
+
+    X_train, X_val = X[train_indices], X[val_indices]
+    y_train, y_val = y[train_indices], y[val_indices]
+
+    return X_train, X_val, y_train, y_val
+
+
+def evaluate(
+    model: Sequential, 
+    X: np.ndarray, 
+    y: np.ndarray,
+    X_train: np.ndarray = None, 
+    X_val: np.ndarray = None, 
+    y_train: np.ndarray = None,
+    y_val: np.ndarray = None,
+    training_fraction: float = 0.6
+) -> Tuple[float, float, float]:
+    """
+    Calculates the MSE of the training, validation, and overall dataset.
+    Training and validation splitting can be provided manually.
+    Otherwise, the function automatically splits the dataset (same seed). 
+    """
+    tf.random.set_seed(42)
+    if (X_train is None) or (X_val is None) or (y_train is None) or (y_val is None):
+        print("splitting ownself")
+        X_train, X_val, y_train, y_val = split_dataset(X, y, training_fraction)
+    mse_train = model.evaluate(X_train, y_train)
+    mse_val = model.evaluate(X_val, y_val)
+    mse_overall = model.evaluate(X, y)
+
+    return mse_train, mse_val, mse_overall
+
+
+def plot_mse_results(
+    x_axis: Literal["nodes", "training_fraction"],
+    list_avg_mse_train: List[float],
+    list_avg_mse_val: List[float],
+    list_avg_mse_overall: List[float],
+    list_stdev_mse_train: List[float],
+    list_stdev_mse_val: List[float],
+    list_stdev_mse_overall: List[float],
+    fig_size = (10,6)
+) -> None: 
+    assert x_axis in ["nodes", "training_fraction"]
+
+    plt.figure(figsize=fig_size)
+    if x_axis == "nodes":
+        x_axis_range = list(range(1, 26, 1))
+        plt.xlabel('Number of Nodes in MLP')
+        plt.ylabel('Mean Squared Error (MSE)')
+        plt.title('MSE vs Number of Nodes in MLP (Mean and SD)')
+    elif x_axis == "training_fraction":
+        x_axis_range = list(range(20, 81, 10))
+        plt.xlabel('Training Fraction (%)')
+        plt.ylabel('Mean Squared Error (MSE)')
+        plt.title('MSE vs Training Fraction (Mean and SD)')
+
+    plt.errorbar(x_axis_range, list_avg_mse_train, yerr=list_stdev_mse_train, fmt='o-', capsize=5, label="MSE Train", color='b')
+    plt.errorbar(x_axis_range, list_avg_mse_val, yerr=list_stdev_mse_val, fmt='o-', capsize=5, label="MSE Val", color='r')
+    plt.errorbar(x_axis_range, list_avg_mse_overall, yerr=list_stdev_mse_overall, fmt='o-', capsize=5, label="MSE Overall", color='g')
+
+    plt.legend()
+    plt.grid(True)
+    plt.show()
+
+
+
+"""
+================
+CODE FOR SPLIT 3
+================
+"""
 
 def mackey_glass_time_series(t: float) -> np.ndarray:
     y = np.empty(t, dtype=np.float64)
