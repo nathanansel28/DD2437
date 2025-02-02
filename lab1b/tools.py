@@ -227,7 +227,7 @@ class TimeSeriesMLP(Model):
         n_epochs=500,
         patience=10,
         early_stopping=True,
-        lmbda=0.01,
+        lmbda=0.0001,
     ):
         super(TimeSeriesMLP, self).__init__()
 
@@ -307,7 +307,7 @@ class TimeSeriesMLP(Model):
                 y_train,
                 validation_data=(X_val, y_val),
                 epochs=self.n_epochs,
-                # batch_size=200,
+                batch_size=32,
                 verbose=1,
                 callbacks=[early_stopping],
             )
@@ -317,7 +317,7 @@ class TimeSeriesMLP(Model):
                 y_train,
                 validation_data=(X_val, y_val),
                 epochs=self.n_epochs,
-                # batch_size=200,
+                batch_size=32,
                 verbose=1,
             )
 
@@ -383,7 +383,7 @@ def plot_training_histories(histories):
 
     # Highlight the best configuration in the legend
     legend = ax.legend(
-        title="Configuration (nodes per layer)",
+        title="Configuration (value of $\\lambda$)",
         bbox_to_anchor=(1.05, 1),
         loc="upper left",
     )
