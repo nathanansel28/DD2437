@@ -1,26 +1,24 @@
 import copy
-from typing import Dict, List, Tuple, Union, Literal
-from dataclasses import dataclass 
+from dataclasses import dataclass
+from typing import List, Literal, Tuple
 
 import matplotlib.pyplot as plt
 import numpy as np
 import seaborn as sns
+import tensorflow as tf
 from sklearn.metrics import mean_squared_error
 from sklearn.neural_network import MLPRegressor
 from sklearn.preprocessing import StandardScaler
 from tensorflow.keras import Model, Sequential, activations, regularizers
 from tensorflow.keras.callbacks import EarlyStopping
-from tensorflow.keras.layers import Dense
 from tensorflow.keras.initializers import HeNormal
-import tensorflow as tf
-import matplotlib.pyplot as plt
+from tensorflow.keras.layers import Dense
 
 """
 ================
 CODE FOR SPLIT 1
 ================
 """
-
 
 
 def generate_dataset(
@@ -108,9 +106,8 @@ CODE FOR SPLIT 2
 ================
 """
 
-def generate_gaussian_data(
-    n: int
-) -> Tuple[np.ndarray, np.ndarray]:
+
+def generate_gaussian_data(n: int) -> Tuple[np.ndarray, np.ndarray]:
     """
     Generate n data samples following the given Gaussian function.
     Returns:
@@ -119,7 +116,7 @@ def generate_gaussian_data(
     """
 
     grid_size = int(np.sqrt(n))
-    n_actual = grid_size ** 2
+    n_actual = grid_size**2
 
     x = np.linspace(-5, 5, grid_size)
     y = np.linspace(-5, 5, grid_size)
@@ -135,45 +132,52 @@ def generate_gaussian_data(
 
     return patterns, targets
 
-@dataclass 
-class ModelResult: 
+
+@dataclass
+class ModelResult:
     "Dataclass to store model and its performance metrics."
     model: Sequential
-    mse_train: float 
+    mse_train: float
     mse_val: float
     mse_overall: float
 
 
 def load_MLP_regressor(
-    n_nodes: int=10,
-    optimizer='adam', 
-    loss='mse',
-    use_kernel_initializer: bool=False
+    n_nodes: int = 10,
+    optimizer="adam",
+    loss="mse",
+    use_kernel_initializer: bool = False,
 ) -> Sequential:
     "Loads a 2-layer Keras MLP with relu activation function."
     tf.random.set_seed(42)
-    if use_kernel_initializer: 
-        model = Sequential([
-            Dense(n_nodes, activation='relu', kernel_initializer=HeNormal(), input_shape=(2,)),
-            Dense(n_nodes, activation='relu', kernel_initializer=HeNormal()),
-            Dense(1, activation='linear')
-        ])
-    else: 
-        model = Sequential([
-            Dense(n_nodes, activation='relu', input_shape=(2,)),
-            Dense(n_nodes, activation='relu'),
-            Dense(1, activation='linear')
-        ])
+    if use_kernel_initializer:
+        model = Sequential(
+            [
+                Dense(
+                    n_nodes,
+                    activation="relu",
+                    kernel_initializer=HeNormal(),
+                    input_shape=(2,),
+                ),
+                Dense(n_nodes, activation="relu", kernel_initializer=HeNormal()),
+                Dense(1, activation="linear"),
+            ]
+        )
+    else:
+        model = Sequential(
+            [
+                Dense(n_nodes, activation="relu", input_shape=(2,)),
+                Dense(n_nodes, activation="relu"),
+                Dense(1, activation="linear"),
+            ]
+        )
     model.compile(optimizer=optimizer, loss=loss)
     return model
 
 
 def split_dataset(
-    X: np.ndarray, 
-    y: np.ndarray,
-    training_fraction: float = 0.6,
-    use_seed: bool = True
-) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]: 
+    X: np.ndarray, y: np.ndarray, training_fraction: float = 0.6, use_seed: bool = True
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     if use_seed:
         np.random.seed(42)
 
@@ -191,19 +195,19 @@ def split_dataset(
 
 
 def evaluate(
-    model: Sequential, 
-    X: np.ndarray, 
+    model: Sequential,
+    X: np.ndarray,
     y: np.ndarray,
-    X_train: np.ndarray = None, 
-    X_val: np.ndarray = None, 
+    X_train: np.ndarray = None,
+    X_val: np.ndarray = None,
     y_train: np.ndarray = None,
     y_val: np.ndarray = None,
-    training_fraction: float = 0.6
+    training_fraction: float = 0.6,
 ) -> Tuple[float, float, float]:
     """
     Calculates the MSE of the training, validation, and overall dataset.
     Training and validation splitting can be provided manually.
-    Otherwise, the function automatically splits the dataset (same seed). 
+    Otherwise, the function automatically splits the dataset (same seed).
     """
     tf.random.set_seed(42)
     if (X_train is None) or (X_val is None) or (y_train is None) or (y_val is None):
@@ -225,28 +229,51 @@ def plot_mse_results(
     list_stdev_mse_train: List[float],
     list_stdev_mse_val: List[float],
     list_stdev_mse_overall: List[float],
-    fig_size = (10,6)
-) -> None: 
+    fig_size=(10, 6),
+) -> None:
     assert x_axis in ["nodes", "training_fraction"]
 
     plt.figure(figsize=fig_size)
     if x_axis == "nodes":
-        plt.xlabel('Number of Nodes in MLP')
-        plt.ylabel('Mean Squared Error (MSE)')
-        plt.title('MSE vs Number of Nodes in MLP (Mean and SD)')
+        plt.xlabel("Number of Nodes in MLP")
+        plt.ylabel("Mean Squared Error (MSE)")
+        plt.title("MSE vs Number of Nodes in MLP (Mean and SD)")
     elif x_axis == "training_fraction":
-        plt.xlabel('Training Fraction (%)')
-        plt.ylabel('Mean Squared Error (MSE)')
-        plt.title('MSE vs Training Fraction (Mean and SD)')
+        plt.xlabel("Training Fraction (%)")
+        plt.ylabel("Mean Squared Error (MSE)")
+        plt.title("MSE vs Training Fraction (Mean and SD)")
 
-    plt.errorbar(x_axis_range, list_avg_mse_train, yerr=list_stdev_mse_train, fmt='o-', capsize=5, label="MSE Train", color='b')
-    plt.errorbar(x_axis_range, list_avg_mse_val, yerr=list_stdev_mse_val, fmt='o-', capsize=5, label="MSE Val", color='r')
-    plt.errorbar(x_axis_range, list_avg_mse_overall, yerr=list_stdev_mse_overall, fmt='o-', capsize=5, label="MSE Overall", color='g')
+    plt.errorbar(
+        x_axis_range,
+        list_avg_mse_train,
+        yerr=list_stdev_mse_train,
+        fmt="o-",
+        capsize=5,
+        label="MSE Train",
+        color="b",
+    )
+    plt.errorbar(
+        x_axis_range,
+        list_avg_mse_val,
+        yerr=list_stdev_mse_val,
+        fmt="o-",
+        capsize=5,
+        label="MSE Val",
+        color="r",
+    )
+    plt.errorbar(
+        x_axis_range,
+        list_avg_mse_overall,
+        yerr=list_stdev_mse_overall,
+        fmt="o-",
+        capsize=5,
+        label="MSE Overall",
+        color="g",
+    )
 
     plt.legend()
     plt.grid(True)
     plt.show()
-
 
 
 """
@@ -254,6 +281,7 @@ def plot_mse_results(
 CODE FOR SPLIT 3
 ================
 """
+
 
 def mackey_glass_time_series(t: float) -> np.ndarray:
     y = np.empty(t, dtype=np.float64)
@@ -371,7 +399,7 @@ class TimeSeriesMLP(Model):
         n_epochs=500,
         patience=10,
         early_stopping=True,
-        lmbda=0.0001,
+        lmbda=0,
     ):
         super(TimeSeriesMLP, self).__init__()
 
@@ -474,7 +502,7 @@ class TimeSeriesMLP(Model):
         return self.model.evaluate(X_eval, y_eval, verbose=0)
 
 
-def plot_training_histories(histories):
+def plot_training_histories(histories, type: Literal["layers", "lambda"] = "layers"):
     """
     Plot training histories for different MLP configurations
 
@@ -485,8 +513,8 @@ def plot_training_histories(histories):
     """
     # Set up the plotting style
     plt.style.use("seaborn-v0_8-whitegrid")
-    plt.rcParams.update({"font.size": 20})
-    fig, ax = plt.subplots(figsize=(12, 8))
+    plt.rcParams.update({"font.size": 12})
+    fig, ax = plt.subplots(1, 1)
 
     # Color palette for different configurations
     n_configs = len(histories)
@@ -527,7 +555,11 @@ def plot_training_histories(histories):
 
     # Highlight the best configuration in the legend
     legend = ax.legend(
-        title="Configuration (value of $\\lambda$)",
+        title=(
+            "Configuration (nodes per layer)"
+            if type == "layers"
+            else "Configuration (lambda value)"
+        ),
         bbox_to_anchor=(1.05, 1),
         loc="upper left",
     )
@@ -538,7 +570,7 @@ def plot_training_histories(histories):
     # Customize the plot
     ax.set_xlabel("Epoch")
     ax.set_ylabel("Average MSE")
-    ax.set_title("MLP Training History for Different Layer Configurations")
+    ax.set_title("MLP Training History for Different Configurations")
     ax.grid(True, alpha=0.3)
 
     # Add text box with best configuration details
