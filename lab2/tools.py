@@ -6,7 +6,10 @@ from numpy.random import default_rng
 
 class AnimalSOM:
     def __init__(
-        self, use_seed: bool=True, seed_value: int=20250205
+        self, 
+        use_seed: bool=True, 
+        seed_value: int=20250205, 
+        use_neighbourhood: bool=True
     ):
         with open('data/animalattributes.txt', 'r') as file:
             lines = file.read().splitlines()
@@ -27,6 +30,7 @@ class AnimalSOM:
         if use_seed:
             np.random.seed(20250205)
         self.weights = np.random.rand(100, 84)
+        self.use_neighbourhood = use_neighbourhood
 
 
     def fit(
@@ -101,7 +105,7 @@ class AnimalSOM:
         step_size: float,
         epoch: int
     ) -> None:
-        neighbourhood_size = self._determine_neighbourhood_size(epoch)
+        neighbourhood_size = self._determine_neighbourhood_size(epoch) if self.use_neighbourhood else 1
         if neighbourhood_size == 1: 
             self.weights[winner_node] += step_size * animal_vector
         else:
