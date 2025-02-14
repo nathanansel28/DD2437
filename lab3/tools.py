@@ -21,18 +21,18 @@ class HopfieldNetwork:
         pattern_indices: Optional[List[int]] = None
     ) -> None:
         """
-        Fits a Hopefield Network using provided patterns or patterns_indices.
+        Fits a Hopefield Network using `patterns` or `patterns_indices`.
 
         Parameters
         ----------
         patterns (Optional[np.ndarray])
             Patterns for the user to directly provide to the network to memorize.
         patterns_indices (Optional[List[int]])
-            List of indices to reference the attribute `p`
+            List of indices to reference the attribute `p to provide the patterns.
             For example, to fit patterns p1, p2, enter patterns_indices=[1,2]
 
         """
-        patterns = self._load_pattern(patterns, pattern_indices)
+        patterns = self._load_pattern(patterns, pattern_indices=pattern_indices)
 
         assert (
             patterns.shape[1] == self.weights.shape[0]
@@ -60,7 +60,35 @@ class HopfieldNetwork:
         return previous
 
 
-    def visualize(
+    def evaluate(
+        self, 
+        patterns_pred: np.ndarray,
+        patterns: Optional[np.ndarray] = None, 
+        pattern_indices: Optional[List[int]] = None
+    ) -> List[bool]:
+        """
+        Evaluates `pattern predictions` based on `patterns`.
+
+        Parameters
+        ----------
+        patterns_pred (np.ndarray)
+            Predicted patterns.
+        patterns (Optional[np.ndarray])
+            Actual patterns for the user to directly provide.
+        patterns_indices (Optional[List[int]])
+            List of indices to reference the attribute `p` to provide the actual patterns.
+            For example, to provide patterns p1, p2, enter patterns_indices=[1,2]            
+        """
+
+        patterns = self._load_pattern(patterns, pattern_indices=pattern_indices)
+        assert patterns_pred.shape == patterns.shape
+
+        return [
+            np.array_equal(pattern_pred, patterns[i]) for i, pattern_pred in enumerate(patterns_pred)
+        ]
+
+
+    def visualize_pattern(
         self, pattern: np.ndarray = None, pattern_index: int = None
     ) -> None: 
         """Visualizes a 1024-bit pattern as a 32x32 image."""
@@ -74,6 +102,7 @@ class HopfieldNetwork:
         plt.title("32x32 Image Visualization")
         plt.colorbar(label="Value (-1 or 1)")
         plt.show()
+
 
 
     def distort_patterns(
@@ -106,7 +135,7 @@ class HopfieldNetwork:
         if seed is not None:
             np.random.seed(seed)
             
-        patterns = self._load_pattern(patterns, pattern_indices)
+        patterns = self._load_pattern(patterns, pattern_indices=pattern_indices)
         distorted_patterns = []
         for pattern in patterns:
             if num_units > pattern.size:
