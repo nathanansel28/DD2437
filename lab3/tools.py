@@ -90,7 +90,38 @@ class HopfieldNetwork:
         ]
 
 
-    def visualize_pattern(
+    def fit_incremental(
+        self, 
+        patterns: np.ndarray
+    ) -> List[int]:
+        """
+        Designed for question 3.5.2.
+        Incrementally adds patterns to the network and checks the stability after each addition.
+        
+        Parameters
+        ----------
+        patterns (np.ndarray)
+            Array of patterns to be added sequentially.
+        
+        Returns
+        -------
+        stable_count_per_step (List[int])
+            Number of stable patterns after each addition.
+        """
+        stable_count_per_step = []
+        
+        for i, pattern in enumerate(patterns):
+            self.weights += np.outer(pattern, pattern)
+            # self.weights /= self.n_nodes
+
+            stable_count = sum(self._is_stable(p) for p in patterns[:i+1])
+            stable_count_per_step.append(stable_count)
+        self.weights /= self.n_nodes
+
+        return stable_count_per_step
+
+
+    def visualizex_pattern(
         self, pattern: np.ndarray = None, pattern_index: int = None
     ) -> None: 
         """Visualizes a 1024-bit pattern as a 32x32 image."""
@@ -104,7 +135,6 @@ class HopfieldNetwork:
         plt.title("32x32 Image Visualization")
         plt.colorbar(label="Value (-1 or 1)")
         plt.show()
-
 
 
     def distort_patterns(
@@ -202,6 +232,29 @@ class HopfieldNetwork:
         return {i + 1: patterns[i] for i in range(11)}
     
 
+    def _is_stable(self, pattern: np.ndarray) -> bool:
+        """
+        Checks if a pattern is stable (does not change after one iteration).
+        
+        Parameters
+        ----------
+        pattern (np.ndarray)
+            The input pattern to check.
+        
+        Returns
+        -------
+        bool
+            True if the pattern is stable, False otherwise.
+        """
+        updated_pattern = np.where(self.weights @ pattern > 0, 1, -1)
+        return np.array_equal(updated_pattern, pattern)
+
+
+
+
+
+
+
 """
 ======================
 OTHER HELPER FUNCTIONS
@@ -210,11 +263,12 @@ OTHER HELPER FUNCTIONS
 
 
 def generate_random_patterns(
-    num_patterns: int, 
+    num_patterns: int,
+    pattern_size: int=1024,  
     seed: Optional[Union[int, None]] = DEFAULT_SEED_VALUE
 ) -> np.ndarray:
     """
-    Generates an array of num_patterns NumPy arrays, each containing 1024 random values of -1 or 1.
+    Generates an array of num_patterns NumPy arrays, each containing 1024 random values of -1 or 1 by default.
 
     Parameters
     ----------
@@ -226,9 +280,9 @@ def generate_random_patterns(
     Returns
     -------
     np.ndarray
-        An array of shape (num_patterns, 1024) filled with random -1 or 1.
+        An array of shape (num_patterns, pattern_size) filled with random -1 or 1.
     """
     if seed is not None:
         np.random.seed(seed)
     
-    return np.random.choice([-1, 1], size=(num_patterns, 1024))
+    return np.random.choice([-1, 1], size=(num_patterns, pattern_size))
