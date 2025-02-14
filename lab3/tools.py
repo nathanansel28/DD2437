@@ -3,6 +3,8 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 
+DEFAULT_SEED_VALUE=20250214
+
 class HopfieldNetwork:
     def __init__(
         self, 
@@ -110,7 +112,7 @@ class HopfieldNetwork:
         num_units: int,
         patterns: Optional[np.ndarray] = None, 
         pattern_indices: Optional[List[int]] = None,
-        seed: Optional[Union[int, None]] = 20250214
+        seed: Optional[Union[int, None]] = DEFAULT_SEED_VALUE
     ) -> np.ndarray:
         """
         Creates a moderate distortion in a given pattern by permutating a specified number of units.
@@ -200,4 +202,33 @@ class HopfieldNetwork:
         return {i + 1: patterns[i] for i in range(11)}
     
 
+"""
+======================
+OTHER HELPER FUNCTIONS
+======================
+"""
+
+
+def generate_random_patterns(
+    num_patterns: int, 
+    seed: Optional[Union[int, None]] = DEFAULT_SEED_VALUE
+) -> np.ndarray:
+    """
+    Generates an array of num_patterns NumPy arrays, each containing 1024 random values of -1 or 1.
+
+    Parameters
+    ----------
+    num_patterns (int)
+        Number of patterns to generate.
+    seed (Optional[int])
+        Seed for reproducibility. Set to `None` TO DISABLE.
+
+    Returns
+    -------
+    np.ndarray
+        An array of shape (num_patterns, 1024) filled with random -1 or 1.
+    """
+    if seed is not None:
+        np.random.seed(seed)
     
+    return np.random.choice([-1, 1], size=(num_patterns, 1024))
