@@ -338,7 +338,7 @@ class HopfieldNetwork:
         bool
             True if the pattern is stable, False otherwise.
         """
-        updated_pattern = np.where(self.weights @ pattern > 0, 1, 0)
+        updated_pattern = np.where(self.weights @ pattern > 0, 1, -1)
         return np.array_equal(updated_pattern, pattern)
 
 
@@ -561,3 +561,20 @@ class BinaryHopfieldNetwork(HopfieldNetwork):
         prediction = 0.5 + 0.5 * np.sign(unit_input - self.theta)
 
         return prediction
+
+    def _is_stable(self, pattern: np.ndarray) -> bool:
+        """
+        Checks if a pattern is stable (does not change after one iteration).
+
+        Parameters
+        ----------
+        pattern (np.ndarray)
+            The input pattern to check.
+
+        Returns
+        -------
+        bool
+            True if the pattern is stable, False otherwise.
+        """
+        updated_pattern = np.where(self.weights @ pattern > 0, 1, 0)
+        return np.array_equal(updated_pattern, pattern)
