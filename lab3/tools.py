@@ -8,7 +8,11 @@ DEFAULT_SEED_VALUE = 20250214
 
 class HopfieldNetwork:
     def __init__(
-        self, n_nodes: int = 100, max_epochs: int = 20, sequential: bool = False
+        self,
+        n_nodes: int = 100,
+        max_epochs: int = 20, 
+        sequential: bool = False,
+        remove_self_connections: bool = False
     ):
         self.n_nodes = n_nodes
         self.epochs = max_epochs
@@ -19,6 +23,7 @@ class HopfieldNetwork:
             self._sequential_update if sequential else self._batch_update
         )
         self.sequential = sequential
+        self.remove_self_connections = remove_self_connections
 
     def fit(
         self,
@@ -43,6 +48,8 @@ class HopfieldNetwork:
             self.weights += np.outer(pattern, pattern)
 
         self.weights /= self.n_nodes
+        if self.remove_self_connections: 
+            np.fill_diagonal(self.weights, 0)
 
     def recall(self, inputs: np.ndarray) -> np.ndarray:
         """
@@ -52,6 +59,10 @@ class HopfieldNetwork:
 
         previous = inputs.copy()
         current_step = len(self.detailed_history)
+
+        if self.remove_self_connections: 
+            np.fill_diagonal(self.weights, 0)
+
 
         for epoch in range(self.epochs):
             # Record state at start of epoch
@@ -198,7 +209,8 @@ class HopfieldNetwork:
 
         for i, pattern in enumerate(patterns):
             self.weights += np.outer(pattern, pattern)
-            # self.weights /= self.n_nodes
+            if self.remove_self_connections: 
+                np.fill_diagonal(self.weights, 0)
 
             stable_count = sum(self._is_stable(p) for p in patterns[: i + 1])
             stable_count_per_step.append(stable_count)
@@ -355,3 +367,17 @@ def generate_random_patterns(
         np.random.seed(seed)
 
     return np.random.choice([-1, 1], size=(num_patterns, pattern_size))
+
+
+# class HopfieldNetwork_6(HopfieldNetwork):
+ 
+class HopfieldNetwork_6(HopfieldNetwork):
+    def __init__(
+        self, 
+        n_nodes = 100, 
+        max_epochs = 20, 
+        remove_self_connections = False
+    ):
+        super().__init__(n_nodes, max_epochs, remove_self_connections)
+
+    
