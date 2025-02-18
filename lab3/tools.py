@@ -577,5 +577,6 @@ class BinaryHopfieldNetwork(HopfieldNetwork):
         bool
             True if the pattern is stable, False otherwise.
         """
-        updated_pattern = np.where(self.weights @ pattern > 0, 1, 0)
+        updated_pattern = np.where(self.weights @ pattern - self.theta > 0, 1, 0)
+
         return np.array_equal(updated_pattern, pattern)
