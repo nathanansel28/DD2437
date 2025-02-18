@@ -397,7 +397,7 @@ def generate_sparse_patterns(
 
     patterns = []
     for _ in range(num_patterns):
-        num_ones = int(pattern_size * average_activity / 100)
+        num_ones = int(pattern_size * average_activity)
         pattern = [1] * num_ones + [0] * (pattern_size - num_ones)
         random.shuffle(pattern)
         patterns.append(pattern)
@@ -416,6 +416,7 @@ class BinaryHopfieldNetwork(HopfieldNetwork):
         remove_self_connections: bool = False
     ):
         super().__init__(n_nodes, max_epochs, sequential, remove_self_connections)
+        self.theta = theta
 
     def rho(self, patterns: np.ndarray) -> float:
         """ Returns the average activity of the network. """
