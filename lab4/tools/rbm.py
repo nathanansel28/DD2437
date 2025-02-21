@@ -91,7 +91,10 @@ class RestrictedBoltzmannMachine():
             h_prob_2, hidden_minibatch_2 = self.get_h_given_v(visible_minibatch_2)
 
             # [TODO TASK 4.1] update the parameters using function 'update_params'
-            
+            self.update_params(
+                visible_minibatch_1, hidden_minibatch_1, visible_minibatch_2, hidden_minibatch_2
+            )
+
             # visualize once in a while when visible layer is input images
             
             if it % self.rf["period"] == 0 and self.is_bottom:
@@ -107,7 +110,7 @@ class RestrictedBoltzmannMachine():
         return
     
 
-    def update_params(self,v_0,h_0,v_k,h_k):
+    def update_params(self, v_0, h_0, v_k, h_k) -> None:
 
         """Update the weight and bias parameters.
 
@@ -123,9 +126,11 @@ class RestrictedBoltzmannMachine():
 
         # [TODO TASK 4.1] get the gradients from the arguments (replace the 0s below) and update the weight and bias parameters
         
-        self.delta_bias_v += 0
-        self.delta_weight_vh += 0
-        self.delta_bias_h += 0
+        self.delta_weight_vh = self.learning_rate * (
+            (v_0.T @ h_0 - v_k.T @ h_k)
+        )
+        self.delta_bias_v = self.learning_rate * (v_0 - v_k)
+        self.delta_bias_h = self.learning_rate * (h_0 - h_k)
         
         self.bias_v += self.delta_bias_v
         self.weight_vh += self.delta_weight_vh
