@@ -85,7 +85,9 @@ class RestrictedBoltzmannMachine():
 	    # [TODO TASK 4.1] run k=1 alternating Gibbs sampling : v_0 -> h_0 ->  v_1 -> h_1.
             # you may need to use the inference functions 'get_h_given_v' and 'get_v_given_h'.
             # note that inference methods returns both probabilities and activations (samples from probablities) and you may have to decide when to use what.
-            visible_minibatch_1 = visible_trainset[:self.batch_size]
+            batch_indices = np.random.choice(visible_trainset.shape[0], self.batch_size, replace=False)
+            visible_minibatch_1 = visible_trainset[batch_indices]
+
             h_prob_1, hidden_minibatch_1 = self.get_h_given_v(visible_minibatch_1)
             v_prob_2, visible_minibatch_2 = self.get_v_given_h(hidden_minibatch_1)
             h_prob_2, hidden_minibatch_2 = self.get_h_given_v(visible_minibatch_2)
@@ -126,16 +128,30 @@ class RestrictedBoltzmannMachine():
 
         # [TODO TASK 4.1] get the gradients from the arguments (replace the 0s below) and update the weight and bias parameters
         
+        # self.delta_weight_vh = np.sum(
+        #     self.learning_rate * ((v_0.T @ h_0 - v_k.T @ h_k))
+        # )
+        # self.delta_bias_v = np.sum(self.learning_rate * (v_0 - v_k))
+        # self.delta_bias_h = np.sum(self.learning_rate * (h_0 - h_k))
+        
+        # self.bias_v += self.delta_bias_v
+        # self.weight_vh += self.delta_weight_vh
+        # self.bias_h += self.delta_bias_h
+
+        # Compute gradients
         self.delta_weight_vh = self.learning_rate * (
             (v_0.T @ h_0 - v_k.T @ h_k)
-        )
-        self.delta_bias_v = self.learning_rate * (v_0 - v_k)
-        self.delta_bias_h = self.learning_rate * (h_0 - h_k)
-        
-        self.bias_v += self.delta_bias_v
-        self.weight_vh += self.delta_weight_vh
-        self.bias_h += self.delta_bias_h
-        
+        ) / v_0.shape[0]
+        self.delta_bias_v = self.learning_rate * np.mean(v_0 - v_k, axis=0)
+        self.delta_bias_h = self.learning_rate * np.mean(h_0 - h_k, axis=0)
+
+        # Apply momentum (if needed)
+        self.weight_vh += self.momentum * (1 - self.momentum) * self.delta_weight_vh
+        self.bias_v += self.momentum * (1 - self.momentum) * self.delta_bias_v
+        self.bias_h += self.momentum * (1 - self.momentum) * self.delta_bias_h
+
+
+
         return
 
     def get_h_given_v(
@@ -207,7 +223,7 @@ class RestrictedBoltzmannMachine():
                         
             # [TODO TASK 4.1] compute probabilities and activations (samples from probabilities) of visible layer (replace the pass and zeros below)             
             prob = sigmoid(
-                self.bias_v + hidden_minibatch @ self.weight_vh
+                self.bias_v + hidden_minibatch @ self.weight_vh.T
             )
             v_sampled = (
                 np.random.rand(*prob.shape) < prob
