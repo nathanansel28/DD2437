@@ -2,6 +2,7 @@ from typing import Dict, List, Optional, Union
 
 import matplotlib.pyplot as plt
 import numpy as np
+import random
 
 DEFAULT_SEED_VALUE = 20250214
 
@@ -28,7 +29,7 @@ class HopfieldNetwork:
     def fit(
         self,
         patterns: Optional[np.ndarray] = None,
-        pattern_indices: Optional[List[int]] = None,
+        pattern_indices: Optional[List[int]] = None
     ) -> None:
         """
         Fits a Hopefield Network using `patterns` or `patterns_indices`.
@@ -219,7 +220,10 @@ class HopfieldNetwork:
         return stable_count_per_step
 
     def visualizex_pattern(
-        self, pattern: np.ndarray = None, pattern_index: int = None
+        self, 
+        pattern: np.ndarray = None, 
+        pattern_index: int = None, 
+        save_path: str = None 
     ) -> None:
         """Visualizes a 1024-bit pattern as a 32x32 image."""
         if pattern is None and pattern_index is None:
@@ -230,7 +234,9 @@ class HopfieldNetwork:
 
         plt.imshow(image, cmap="gray", vmin=-1, vmax=1)
         plt.title("32x32 Image Visualization")
-        plt.colorbar(label="Value (-1 or 1)")
+        if save_path: 
+            plt.savefig(save_path)
+        # plt.colorbar(label="Value (-1 or 1)")
         plt.show()
 
     def distort_patterns(
@@ -368,16 +374,209 @@ def generate_random_patterns(
 
     return np.random.choice([-1, 1], size=(num_patterns, pattern_size))
 
+def generate_biased_patterns(
+    num_patterns: int, 
+    patterns_size: int = 1024, 
+    seed: Optional[Union[int, None]] = DEFAULT_SEED_VALUE
+) -> np.ndarray: 
+    """
+    Generates an array of num_patterns NumPy arrays, each containing 1024 values of -1 or 1 by default.
+    However, the +1 s are biased (there are more +1 s in the patterns). 
+    """
+    return np.where(0.5 + np.random.randn(num_patterns, patterns_size) >= 0, 1, -1)
 
-# class HopfieldNetwork_6(HopfieldNetwork):
- 
-class HopfieldNetwork_6(HopfieldNetwork):
+def generate_sparse_patterns(
+    num_patterns: int, 
+    pattern_size: int = 300,
+    average_activity: float = 0.1, 
+    seed: Optional[Union[int, None]] = DEFAULT_SEED_VALUE
+) -> np.ndarray: 
+    if seed is not None:
+        np.random.seed(seed)
+        random.seed(seed)
+
+    patterns = []
+    for _ in range(num_patterns):
+        num_ones = int(pattern_size * average_activity)
+        pattern = [1] * num_ones + [0] * (pattern_size - num_ones)
+        random.shuffle(pattern)
+        patterns.append(pattern)
+    
+    return np.array(patterns)
+
+
+
+class BinaryHopfieldNetwork(HopfieldNetwork):
     def __init__(
         self, 
-        n_nodes = 100, 
-        max_epochs = 20, 
-        remove_self_connections = False
+        theta: float,
+        n_nodes: int = 100, 
+        max_epochs: int = 20, 
+        sequential: bool = False,
+        remove_self_connections: bool = False
     ):
-        super().__init__(n_nodes, max_epochs, remove_self_connections)
+        super().__init__(n_nodes, max_epochs, sequential, remove_self_connections)
+        self.theta = theta
 
+    def rho(self, patterns: np.ndarray) -> float:
+        """ Returns the average activity of the network. """
+        P = np.unique(patterns, axis=0).shape[0]
+        return np.sum(patterns) / (self.n_nodes * P)
+
+
+    def fit(
+        self, 
+        patterns: Optional[np.ndarray] = None,
+        pattern_indices: Optional[List[int]] = None
+    ) -> np.ndarray: 
+        """
+        Fits a Hopfield network using `patterns` or `patterns_indices.`
+        Importantly, the node values are 0 or 1 in this implementation. 
+
+        Parameters
+        ----------
+        patterns (Optional[np.ndarray])
+            Patterns for the user to directly provide to the network to memorize.
+        patterns_indices (Optional[List[int]])
+            List of indices to reference the attribute `p to provide the patterns.
+            For example, to fit patterns p1, p2, enter patterns_indices=[1,2]
+        """
+        patterns = self._load_pattern(patterns, pattern_indices=pattern_indices)
+
+        for pattern in patterns:
+            self.weights += np.outer(pattern - self.rho(patterns), pattern - self.rho(patterns))
+
+
+    def fit_incremental(self, patterns: np.ndarray) -> List[int]:
+        stable_count_per_step = []
+
+        for i, pattern in enumerate(patterns):
+            self.weights += np.outer(pattern - self.rho(patterns), pattern - self.rho(patterns))
+            if self.remove_self_connections: 
+                np.fill_diagonal(self.weights, 0)
+
+            stable_count = sum(self._is_stable(p) for p in patterns[: i + 1])
+            stable_count_per_step.append(stable_count)
+        self.weights /= self.n_nodes
+
+        return stable_count_per_step
+  
+
+
+    def recall(self, inputs: np.ndarray) -> np.ndarray:
+        """
+        Recall method supporting both sequential and batch updates with continuous history tracking.
+        Importantly, here the recall supports node values of 0 or 1 and provides a bias term.
+        """
+        self.detailed_history = []
+
+        previous = inputs.copy()
+        current_step = len(self.detailed_history)
+
+        if self.remove_self_connections: 
+            np.fill_diagonal(self.weights, 0)
+
+
+        for epoch in range(self.epochs):
+            # Record state at start of epoch
+            self._record_state(previous, epoch, current_step)
+            current_step += 1
+
+            # Perform update based on mode
+            current = self.step_function(previous, current_step)
+
+            # Check for convergence
+            if np.array_equal(current, previous):
+                break
+
+            previous = current.copy()
+            current_step = len(self.detailed_history)
+
+        return previous
+
+
+    def _sequential_update(self, inputs: np.ndarray, current_step: int) -> np.ndarray:
+        """
+        Updates units sequentially in random order using optimized NumPy operations.
+        Importantly, here the recall supports node values of 0 or 1 and provides a bias term.
+        
+        Parameters
+        ----------
+        inputs : np.ndarray
+            Input patterns of shape (n_patterns, n_nodes)
+
+        Returns
+        -------
+        np.ndarray
+            Updated patterns after sequential updates
+        """
+        prediction = np.copy(inputs)
+        n_patterns = inputs.shape[0]
+
+        # For each pattern
+        for pattern_idx in range(n_patterns):
+            # Generate random order of units to update
+            unit_order = np.random.permutation(self.n_nodes)
+
+            # Create a mask to zero out self-connections
+            mask = np.ones(self.n_nodes)
+
+            # Update each unit sequentially, but use vectorized operations
+            for unit_idx in unit_order:
+                # Zero out self-connection for current unit
+                mask[unit_idx] = 0
+
+                # Calculate input to the current unit using vectorized operations
+                # Multiply current states by weights and mask, then sum
+                unit_input = np.sum(
+                    self.weights[unit_idx] * prediction[pattern_idx] * mask
+                )
+
+                # Update the unit's state
+                prediction[pattern_idx, unit_idx] = 0.5 + 0.5 * np.sign(unit_input - self.theta)
+
+                # Restore mask for next iteration
+                mask[unit_idx] = 1
+
+                self.detailed_history.append(
+                    {
+                        "step": current_step,
+                        "epoch": current_step // (self.n_nodes * n_patterns),
+                        "pattern_idx": pattern_idx,
+                        "update_type": "sequential",
+                        "unit_updated": unit_idx,
+                        "state": prediction.copy(),
+                    }
+                )
+                current_step += 1
+
+        return prediction
     
+
+    def _batch_update(self, inputs: np.ndarray, current_step: int) -> np.ndarray:
+        """
+        Batch update with history tracking.
+        """
+        # Calculate predictions for all units at once
+        unit_input = inputs @ self.weights
+        prediction = 0.5 + 0.5 * np.sign(unit_input - self.theta)
+
+        return prediction
+
+    def _is_stable(self, pattern: np.ndarray) -> bool:
+        """
+        Checks if a pattern is stable (does not change after one iteration).
+
+        Parameters
+        ----------
+        pattern (np.ndarray)
+            The input pattern to check.
+
+        Returns
+        -------
+        bool
+            True if the pattern is stable, False otherwise.
+        """
+        updated_pattern = np.where(self.weights @ pattern - self.theta > 0, 1, 0)
+
+        return np.array_equal(updated_pattern, pattern)
