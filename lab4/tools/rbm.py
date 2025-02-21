@@ -1,4 +1,5 @@
 from util import *
+from typing import Tuple
 
 class RestrictedBoltzmannMachine():
     '''
@@ -66,7 +67,7 @@ class RestrictedBoltzmannMachine():
         return
 
         
-    def cd1(self,visible_trainset, n_iterations=10000):
+    def cd1(self, visible_trainset, n_iterations=10000):
         
         """Contrastive Divergence with k=1 full alternating Gibbs sampling
 
@@ -84,6 +85,10 @@ class RestrictedBoltzmannMachine():
 	    # [TODO TASK 4.1] run k=1 alternating Gibbs sampling : v_0 -> h_0 ->  v_1 -> h_1.
             # you may need to use the inference functions 'get_h_given_v' and 'get_v_given_h'.
             # note that inference methods returns both probabilities and activations (samples from probablities) and you may have to decide when to use what.
+            visible_minibatch_1 = visible_trainset[:self.batch_size]
+            h_prob_1, hidden_minibatch_1 = self.get_h_given_v(visible_minibatch_1)
+            v_prob_2, visible_minibatch_2 = self.get_v_given_h(hidden_minibatch_1)
+            h_prob_2, hidden_minibatch_2 = self.get_h_given_v(visible_minibatch_2)
 
             # [TODO TASK 4.1] update the parameters using function 'update_params'
             
@@ -128,7 +133,9 @@ class RestrictedBoltzmannMachine():
         
         return
 
-    def get_h_given_v(self,visible_minibatch):
+    def get_h_given_v(
+        self, visible_minibatch: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         
         """Compute probabilities p(h|v) and activations h ~ p(h|v) 
 
@@ -147,10 +154,16 @@ class RestrictedBoltzmannMachine():
 
         # [TODO TASK 4.1] compute probabilities and activations (samples from probabilities) of hidden layer (replace the zeros below) 
         
-        return np.zeros((n_samples,self.ndim_hidden)), np.zeros((n_samples,self.ndim_hidden))
+        prob = sigmoid(self.bias_h + visible_minibatch @ self.weight_vh)
+        h_sampled = (np.random.rand(*prob.shape) < prob).astype(np.float32)
+    
+        return prob, h_sampled
 
 
-    def get_v_given_h(self,hidden_minibatch):
+
+    def get_v_given_h(
+        self, hidden_minibatch: np.ndarray
+    ) -> Tuple[np.ndarray, np.ndarray]:
         
         """Compute probabilities p(v|h) and activations v ~ p(v|h)
 
