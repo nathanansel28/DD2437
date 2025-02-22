@@ -1,11 +1,21 @@
 from util import *
-from typing import Tuple
+from typing import Tuple, List
 
 class RestrictedBoltzmannMachine():
     '''
     For more details : A Practical Guide to Training Restricted Boltzmann Machines https://www.cs.toronto.edu/~hinton/absps/guideTR.pdf
     '''
-    def __init__(self, ndim_visible, ndim_hidden, is_bottom=False, image_size=[28,28], is_top=False, n_labels=10, batch_size=10):
+    def __init__(
+        self, 
+        ndim_visible, 
+        ndim_hidden, 
+        is_bottom=False, 
+        image_size=[28,28], 
+        is_top=False, 
+        n_labels=10, 
+        batch_size=10,
+        show_histograms=False
+    ):
 
         """
         Args:
@@ -56,14 +66,22 @@ class RestrictedBoltzmannMachine():
         
         self.momentum = 0.7
 
-        self.print_period = 5000
+        self.show_histograms = show_histograms
+
+        # self.print_period = 5000
+        self.print_period = 2500
         
         self.rf = { # receptive-fields. Only applicable when visible layer is input data
-            "period" : 5000, # iteration period to visualize
+            # "period" : 5000, # iteration period to visualize
+            "period" : 2500, # iteration period to visualize
             "grid" : [5,5], # size of the grid
             "ids" : np.random.randint(0,self.ndim_hidden,25) # pick some random hidden units
             }
         
+        self.history = {
+            "reconstruction_loss": []
+        }
+
         return
 
         
@@ -80,21 +98,27 @@ class RestrictedBoltzmannMachine():
         
         n_samples = visible_trainset.shape[0]
 
-        for it in range(n_iterations):
+        for it in range(n_iterations+1):
 
 	    # [TODO TASK 4.1] run k=1 alternating Gibbs sampling : v_0 -> h_0 ->  v_1 -> h_1.
             # you may need to use the inference functions 'get_h_given_v' and 'get_v_given_h'.
             # note that inference methods returns both probabilities and activations (samples from probablities) and you may have to decide when to use what.
             batch_indices = np.random.choice(visible_trainset.shape[0], self.batch_size, replace=False)
-            visible_minibatch_1 = visible_trainset[batch_indices]
 
-            h_prob_1, hidden_minibatch_1 = self.get_h_given_v(visible_minibatch_1)
-            v_prob_2, visible_minibatch_2 = self.get_v_given_h(hidden_minibatch_1)
-            h_prob_2, hidden_minibatch_2 = self.get_h_given_v(visible_minibatch_2)
+            v0_activation = visible_trainset[batch_indices]
+            h0_prob, h0_activation = self.get_h_given_v(v0_activation)
+            v1_prob, v1_activation = self.get_v_given_h(h0_activation)
+            h1_prob, h1_activation = self.get_h_given_v(v1_prob)
+
+            self.history['reconstruction_loss'].append(
+                self.compute_reconstruction_loss(
+                    v0_activation, self.get_v_given_h(h1_activation)
+                )
+            )
 
             # [TODO TASK 4.1] update the parameters using function 'update_params'
             self.update_params(
-                visible_minibatch_1, hidden_minibatch_1, visible_minibatch_2, hidden_minibatch_2
+                v0_activation, h0_activation, v1_prob, h1_prob
             )
 
             # visualize once in a while when visible layer is input images
@@ -106,8 +130,15 @@ class RestrictedBoltzmannMachine():
             # print progress
             
             if it % self.print_period == 0 :
-
-                print ("iteration=%7d recon_loss=%4.4f"%(it, np.linalg.norm(visible_trainset - visible_trainset)))
+                viz_rf(
+                    weights = self.weight_vh[:,self.rf["ids"]].reshape((28, 28, -1)), 
+                    it = it, 
+                    grid = self.rf["grid"]
+                )
+                if self.show_histograms:
+                    self.plot_histograms()
+                # print ("iteration=%7d recon_loss=%4.4f"%(it, np.linalg.norm(visible_trainset - visible_trainset)))
+                print ("iteration=%7d recon_loss=%4.4f"%(it, np.linalg.norm(v0_activation - self.get_v_given_h(h1_activation))))
         
         return
     
@@ -233,7 +264,39 @@ class RestrictedBoltzmannMachine():
         return prob, v_sampled
 
 
+    def plot_histograms(self):
+        """Plot histograms of weights, visible biases, and hidden biases."""
+        plt.figure(figsize=(15, 4))
+
+        # Histogram of weights
+        plt.subplot(1, 3, 1)
+        plt.hist(self.weight_vh.flatten(), bins=50, color='blue', alpha=0.7)
+        plt.title("Histogram of Weights")
+
+        # Histogram of visible biases
+        plt.subplot(1, 3, 2)
+        plt.hist(self.bias_v, bins=50, color='red', alpha=0.7)
+        plt.title("Histogram of Visible Biases")
+
+        # Histogram of hidden biases
+        plt.subplot(1, 3, 3)
+        plt.hist(self.bias_h, bins=50, color='green', alpha=0.7)
+        plt.title("Histogram of Hidden Biases")
+
+        plt.show()
+
     
+    def compute_reconstruction_loss(
+        self, v_actual: np.ndarray, v_reconstructed: np.ndarray
+    ) -> float:
+        return np.linalg.norm(v_actual - v_reconstructed)
+
+
+    def fetch_reconstruction_loss(self) -> List[float]:
+        return self.history['reconstruction_loss']
+
+
+
     """ rbm as a belief layer : the functions below do not have to be changed until running a deep belief net """
 
     
