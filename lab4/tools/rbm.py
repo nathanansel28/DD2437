@@ -301,7 +301,7 @@ class RestrictedBoltzmannMachine:
         self.weight_h_to_v = np.copy(np.transpose(self.weight_vh))
         self.weight_vh = None
 
-    def get_h_given_v_dir(self, visible_minibatch):
+    def get_h_given_v_dir(self, visible_minibatch: np.ndarray):
         """Compute probabilities p(h|v) and activations h ~ p(h|v)
 
         Uses directed weight "weight_v_to_h" and bias "bias_h"
@@ -315,12 +315,12 @@ class RestrictedBoltzmannMachine:
 
         assert self.weight_v_to_h is not None
 
-        probs = sigmoid(self.bias_h + visible_minibatch @ self.weight_vh)
+        probs = sigmoid(self.bias_h + visible_minibatch @ self.weight_v_to_h)
         sample = sample_binary(probs)
 
         return probs, sample
 
-    def get_v_given_h_dir(self, hidden_minibatch):
+    def get_v_given_h_dir(self, hidden_minibatch: np.ndarray):
         """Compute probabilities p(v|h) and activations v ~ p(v|h)
 
         Uses directed weight "weight_h_to_v" and bias "bias_v"
@@ -333,8 +333,6 @@ class RestrictedBoltzmannMachine:
         """
 
         assert self.weight_h_to_v is not None
-
-        n_samples = hidden_minibatch.shape[0]
 
         if self.is_top:
 
@@ -349,16 +347,24 @@ class RestrictedBoltzmannMachine:
             # this case should never be executed : when the RBM is a part of a DBN and is at the top, it will have not have directed connections.
             # Appropriate code here is to raise an error (replace pass below)
 
-            pass
+            raise ValueError(
+                f"An RBM at the top cannot have directed connections. Cause: self.top = True"
+            )
 
         else:
 
             # [TODO TASK 4.2] performs same computaton as the function 'get_v_given_h' but with directed connections (replace the pass and zeros below)
+            support = self.bias_v + hidden_minibatch @ self.weight_h_to_v
+            data, labels = support[:, : -self.n_labels], support[:, -self.n_labels :]
 
-            pass
+            data = sigmoid(data)
+            data_sample = sample_binary(data)
 
-        return np.zeros((n_samples, self.ndim_visible)), np.zeros(
-            (n_samples, self.ndim_visible)
+            labels = softmax(labels)
+            labels_sample = sample_categorical(labels)
+
+        return np.concatenate((data, labels), axis=1), np.concatenate(
+            (data_sample, labels_sample), axis=1
         )
 
     def update_generate_params(self, inps, trgs, preds):
