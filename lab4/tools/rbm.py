@@ -1,5 +1,8 @@
+from math import ceil
 from typing import List, Tuple
 
+from numpy import ndarray
+from tqdm import tqdm
 from util import *
 
 
@@ -102,28 +105,31 @@ class RestrictedBoltzmannMachine:
 
         n_samples = visible_trainset.shape[0]
 
-        for it in range(n_iterations + 1):
+        # number of mini batch in each iteration
+        batches_number = ceil(n_samples / self.batch_size)
+        iterations = tqdm(range(n_iterations + 1))
+
+        for it in iterations:
+            np.random.shuffle(visible_trainset)
 
             # [TODO TASK 4.1] run k=1 alternating Gibbs sampling : v_0 -> h_0 ->  v_1 -> h_1.
             # you may need to use the inference functions 'get_h_given_v' and 'get_v_given_h'.
             # note that inference methods returns both probabilities and activations (samples from probablities) and you may have to decide when to use what.
-            batch_indices = np.random.choice(
-                visible_trainset.shape[0], self.batch_size, replace=False
-            )
+            for batch in tqdm(
+                range(batches_number), desc=f"iteration {it}", leave=False
+            ):
+                start = batch * self.batch_size
+                end = min((batch + 1) * self.batch_size, n_samples)
 
-            v0_activation = visible_trainset[batch_indices]
-            h0_prob, h0_activation = self.get_h_given_v(v0_activation)
-            v1_prob, v1_activation = self.get_v_given_h(h0_activation)
-            h1_prob, h1_activation = self.get_h_given_v(v1_prob)
+                v0_activation = visible_trainset[start:end, :]
+                h0_prob, h0_activation = self.get_h_given_v(v0_activation)
+                v1_prob, v1_activation = self.get_v_given_h(h0_activation)
+                h1_prob, h1_activation = self.get_h_given_v(v1_activation)
 
-            self.history["reconstruction_loss"].append(
-                self.compute_reconstruction_loss(
-                    v0_activation, self.get_v_given_h(h1_activation)
+                # [TODO TASK 4.1] update the parameters using function 'update_params'
+                self.update_params(
+                    v0_activation, h0_activation, v1_activation, h1_activation
                 )
-            )
-
-            # [TODO TASK 4.1] update the parameters using function 'update_params'
-            self.update_params(v0_activation, h0_activation, v1_prob, h1_prob)
 
             # visualize once in a while when visible layer is input images
 
@@ -138,25 +144,18 @@ class RestrictedBoltzmannMachine:
                 )
 
             # print progress
+            _, h = self.get_h_given_v(visible_trainset)
+            _, reconstruction = self.get_v_given_h(h)
+            loss = self.compute_reconstruction_loss(visible_trainset, reconstruction)
 
             if it % self.print_period == 0:
-                viz_rf(
-                    weights=self.weight_vh[:, self.rf["ids"]].reshape((28, 28, -1)),
-                    it=it,
-                    grid=self.rf["grid"],
-                )
                 if self.show_histograms:
                     self.plot_histograms()
-                # print ("iteration=%7d recon_loss=%4.4f"%(it, np.linalg.norm(visible_trainset - visible_trainset)))
-                print(
-                    "iteration=%7d recon_loss=%4.4f"
-                    % (
-                        it,
-                        np.linalg.norm(
-                            v0_activation - self.get_v_given_h(h1_activation)
-                        ),
-                    )
-                )
+                self.history["reconstruction_loss"].append(loss)
+
+            iterations.set_description(
+                "iteration=%7d recon_loss=%4.4f" % (it, loss), refresh=True
+            )
 
         return
 
@@ -175,27 +174,22 @@ class RestrictedBoltzmannMachine:
 
         # [TODO TASK 4.1] get the gradients from the arguments (replace the 0s below) and update the weight and bias parameters
 
-        # self.delta_weight_vh = np.sum(
-        #     self.learning_rate * ((v_0.T @ h_0 - v_k.T @ h_k))
-        # )
-        # self.delta_bias_v = np.sum(self.learning_rate * (v_0 - v_k))
-        # self.delta_bias_h = np.sum(self.learning_rate * (h_0 - h_k))
+        self.delta_bias_v = self.learning_rate * (
+            np.sum(v_0 - v_k, axis=0)
+        )  # /v_0.shape[0]
+        self.delta_weight_vh = self.learning_rate * ((v_0.T @ h_0) - (v_k.T @ h_k))
+        self.delta_bias_h = self.learning_rate * (
+            np.sum(h_0 - h_k, axis=0)
+        )  # /h_0.shape[0]
 
-        # self.bias_v += self.delta_bias_v
-        # self.weight_vh += self.delta_weight_vh
-        # self.bias_h += self.delta_bias_h
-
-        # Compute gradients
-        self.delta_weight_vh = (
-            self.learning_rate * ((v_0.T @ h_0 - v_k.T @ h_k)) / v_0.shape[0]
-        )
-        self.delta_bias_v = self.learning_rate * np.mean(v_0 - v_k, axis=0)
-        self.delta_bias_h = self.learning_rate * np.mean(h_0 - h_k, axis=0)
+        self.bias_v += self.delta_bias_v
+        self.weight_vh += self.delta_weight_vh
+        self.bias_h += self.delta_bias_h
 
         # Apply momentum (if needed)
-        self.weight_vh += self.momentum * (1 - self.momentum) * self.delta_weight_vh
-        self.bias_v += self.momentum * (1 - self.momentum) * self.delta_bias_v
-        self.bias_h += self.momentum * (1 - self.momentum) * self.delta_bias_h
+        # self.weight_vh += self.momentum * (1 - self.momentum) * self.delta_weight_vh
+        # self.bias_v += self.momentum * (1 - self.momentum) * self.delta_bias_v
+        # self.bias_h += self.momentum * (1 - self.momentum) * self.delta_bias_h
 
         return
 
@@ -253,8 +247,17 @@ class RestrictedBoltzmannMachine:
 
             # [TODO TASK 4.1] compute probabilities and activations (samples from probabilities) of visible layer (replace the pass below). \
             # Note that this section can also be postponed until TASK 4.2, since in this task, stand-alone RBMs do not contain labels in visible layer.
+            support = self.bias_v + hidden_minibatch @ self.weight_vh.T
+            data, labels = support[:, : -self.n_labels], support[:, -self.n_labels :]
 
-            pass
+            data = sigmoid(data)
+            data_sample = sample_binary(data)
+
+            labels = softmax(labels)
+            labels_sample = sample_categorical(labels)
+
+            prob = np.concatenate((data, labels), axis=1)
+            v_sampled = np.concatenate((data_sample, labels_sample), axis=1)
 
         else:
 
@@ -301,7 +304,9 @@ class RestrictedBoltzmannMachine:
         self.weight_h_to_v = np.copy(np.transpose(self.weight_vh))
         self.weight_vh = None
 
-    def get_h_given_v_dir(self, visible_minibatch: np.ndarray):
+    def get_h_given_v_dir(
+        self, visible_minibatch: np.ndarray
+    ) -> Tuple[ndarray[float], ndarray[float]]:
         """Compute probabilities p(h|v) and activations h ~ p(h|v)
 
         Uses directed weight "weight_v_to_h" and bias "bias_h"
@@ -320,7 +325,9 @@ class RestrictedBoltzmannMachine:
 
         return probs, sample
 
-    def get_v_given_h_dir(self, hidden_minibatch: np.ndarray):
+    def get_v_given_h_dir(
+        self, hidden_minibatch: np.ndarray
+    ) -> Tuple[ndarray[float], ndarray[float]]:
         """Compute probabilities p(v|h) and activations v ~ p(v|h)
 
         Uses directed weight "weight_h_to_v" and bias "bias_v"
@@ -355,17 +362,10 @@ class RestrictedBoltzmannMachine:
 
             # [TODO TASK 4.2] performs same computaton as the function 'get_v_given_h' but with directed connections (replace the pass and zeros below)
             support = self.bias_v + hidden_minibatch @ self.weight_h_to_v
-            data, labels = support[:, : -self.n_labels], support[:, -self.n_labels :]
+            probs = sigmoid(support)
+            activ = sample_binary(probs)
 
-            data = sigmoid(data)
-            data_sample = sample_binary(data)
-
-            labels = softmax(labels)
-            labels_sample = sample_categorical(labels)
-
-        return np.concatenate((data, labels), axis=1), np.concatenate(
-            (data_sample, labels_sample), axis=1
-        )
+        return probs, activ
 
     def update_generate_params(self, inps, trgs, preds):
         """Update generative weight "weight_h_to_v" and bias "bias_v"
