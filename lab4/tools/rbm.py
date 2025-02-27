@@ -19,7 +19,7 @@ class RestrictedBoltzmannMachine:
         image_size=[28, 28],
         is_top=False,
         n_labels=10,
-        batch_size=10,
+        batch_size=30000,
         show_histograms=False,
     ):
         """
@@ -78,11 +78,11 @@ class RestrictedBoltzmannMachine:
         self.show_histograms = show_histograms
 
         # self.print_period = 5000
-        self.print_period = 2500
+        self.print_period = 50
 
         self.rf = {  # receptive-fields. Only applicable when visible layer is input data
             # "period" : 5000, # iteration period to visualize
-            "period": 2500,  # iteration period to visualize
+            "period": 50,  # iteration period to visualize
             "grid": [5, 5],  # size of the grid
             "ids": np.random.randint(
                 0, self.ndim_hidden, 25
@@ -146,12 +146,16 @@ class RestrictedBoltzmannMachine:
             # print progress
             _, h = self.get_h_given_v(visible_trainset)
             _, reconstruction = self.get_v_given_h(h)
-            loss = self.compute_reconstruction_loss(visible_trainset, reconstruction)
+            loss = (
+                self.compute_reconstruction_loss(visible_trainset, reconstruction)
+                / self.batch_size
+            )
 
             if it % self.print_period == 0:
                 if self.show_histograms:
                     self.plot_histograms()
-                self.history["reconstruction_loss"].append(loss)
+
+            self.history["reconstruction_loss"].append(loss)
 
             iterations.set_description(
                 "iteration=%7d recon_loss=%4.4f" % (it, loss), refresh=True

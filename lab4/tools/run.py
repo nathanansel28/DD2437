@@ -1,5 +1,8 @@
+from json import dump
+
 from dbn import DeepBeliefNet
 from rbm import RestrictedBoltzmannMachine
+from tqdm import tqdm
 from util import *
 
 if __name__ == "__main__":
@@ -13,17 +16,25 @@ if __name__ == "__main__":
 
     print("\nStarting a Restricted Boltzmann Machine..")
 
-    rbm = RestrictedBoltzmannMachine(
-        ndim_visible=image_size[0] * image_size[1],
-        ndim_hidden=200,
-        is_bottom=True,
-        image_size=image_size,
-        is_top=False,
-        n_labels=10,
-        batch_size=10,
-    )
+    desc = tqdm(np.arange(start=100, stop=501, step=100, dtype=int))
 
-    rbm.cd1(visible_trainset=train_imgs, n_iterations=10000)
+    for hid in desc:
+        desc.set_description(f"|hid| = {hid}")
+
+        rbm = RestrictedBoltzmannMachine(
+            ndim_visible=image_size[0] * image_size[1],
+            ndim_hidden=hid,
+            is_bottom=True,
+            image_size=image_size,
+            is_top=False,
+            n_labels=10,
+            batch_size=200,
+        )
+
+        rbm.cd1(visible_trainset=train_imgs, n_iterations=200)
+
+        with open(f"./rbm_reconstruction_loss_{hid}.json", "w") as f:
+            dump(rbm.history, f)
 
     """ deep- belief net """
 
